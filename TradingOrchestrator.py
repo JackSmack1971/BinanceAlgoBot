@@ -4,10 +4,9 @@ from typing import Dict, List, Optional
 from binance.client import Client
 
 from config import TRADING_CONFIG, RISK_CONFIG, LOGGING_CONFIG
-from data_feed import DataFeed
-from btcstrategy import BTCStrategy
 from execution_engine import ExecutionEngine
 from risk_management import RiskManagement
+from strategy_factory import StrategyFactory, Strategy
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +65,29 @@ class TradingOrchestrator:
                 self.client = Client(self.api_key, self.api_secret)
                 logger.info("Using Binance production API")
             
+            # Get the default strategy type from config
+            from config import TRADING_CONFIG
+            default_strategy_type = TRADING_CONFIG.get("default_strategy_type", "btc")
+            
             # Initialize components for each symbol-interval pair
             for symbol in self.symbols:
                 for interval in self.intervals:
                     # Create a unique key for each symbol-interval pair
                     key = f"{symbol}_{interval}"
                     
+                    # Create strategy using the factory
+                    strategy = StrategyFactory.create_strategy(
+                        default_strategy_type, 
+                        self.client, 
+                        symbol, 
+                        interval
+                    )
+                    
+                    if strategy is None:
+                        logger.error(f"Failed to create strategy for {key}")
+                        continue
+                    
                     # Initialize components
-                    strategy = BTCStrategy(self.client, symbol, interval)
                     execution_engine = ExecutionEngine(self.client, strategy, TRADING_CONFIG["default_quantity"])
                     risk_management = RiskManagement(self.client, strategy, execution_engine, RISK_CONFIG["max_risk_per_trade"])
                     
@@ -144,63 +158,15 @@ class TradingOrchestrator:
             self.is_running = False
             return False
     
-    def stop_trading(self):
+    def add_strategy(self, symbol: str, interval: str, strategy_type: str, **kwargs) -> bool:
         """
-        Stop the trading process.
-        """
-        logger.info("Stopping trading process")
-        self.is_running = False
-    
-    def get_account_info(self) -> Optional[Dict]:
-        """
-        Get account information from Binance.
-        
-        Returns:
-            Dict: Account information
-        """
-        if not self.client:
-            logger.error("Client not initialized. Call initialize() first.")
-            return None
-        
-        try:
-            account_info = self.client.get_account()
-            return account_info
-        except Exception as e:
-            logger.error(f"Error getting account information: {e}", exc_info=True)
-            return None
-    
-    def get_account_balance(self, asset: str = 'USDT') -> Optional[float]:
-        """
-        Get account balance for a specific asset.
-        
-        Args:
-            asset (str): Asset symbol. Defaults to 'USDT'.
-            
-        Returns:
-            float: Asset balance
-        """
-        account_info = self.get_account_info()
-        if not account_info:
-            return None
-        
-        try:
-            for balance in account_info['balances']:
-                if balance['asset'] == asset:
-                    return float(balance['free'])
-            
-            logger.warning(f"Asset {asset} not found in account")
-            return 0.0
-        except Exception as e:
-            logger.error(f"Error getting account balance: {e}", exc_info=True)
-            return None
-    
-    def add_symbol_interval(self, symbol: str, interval: str) -> bool:
-        """
-        Add a new symbol-interval pair to the trading orchestrator.
+        Add a new strategy for a symbol-interval pair.
         
         Args:
             symbol (str): Trading symbol
             interval (str): Timeframe interval
+            strategy_type (str): Strategy type identifier
+            **kwargs: Additional parameters for the strategy
             
         Returns:
             bool: True if successful, False otherwise
@@ -215,8 +181,20 @@ class TradingOrchestrator:
             return False
         
         try:
+            # Create strategy using the factory
+            strategy = StrategyFactory.create_strategy(
+                strategy_type, 
+                self.client, 
+                symbol, 
+                interval, 
+                **kwargs
+            )
+            
+            if strategy is None:
+                logger.error(f"Failed to create strategy for {key}")
+                return False
+            
             # Initialize components
-            strategy = BTCStrategy(self.client, symbol, interval)
             execution_engine = ExecutionEngine(self.client, strategy, TRADING_CONFIG["default_quantity"])
             risk_management = RiskManagement(self.client, strategy, execution_engine, RISK_CONFIG["max_risk_per_trade"])
             
@@ -227,7 +205,7 @@ class TradingOrchestrator:
                 "risk_management": risk_management
             }
             
-            logger.info(f"Added {key} to the components")
+            logger.info(f"Added {strategy_type} strategy for {key}")
             
             # Add symbol and interval to the lists if not already present
             if symbol not in self.symbols:
@@ -237,192 +215,58 @@ class TradingOrchestrator:
             
             return True
         except Exception as e:
-            logger.error(f"Error adding {key}: {e}", exc_info=True)
+            logger.error(f"Error adding strategy: {e}", exc_info=True)
             return False
     
-    def remove_symbol_interval(self, symbol: str, interval: str) -> bool:
+    def change_strategy(self, symbol: str, interval: str, strategy_type: str, **kwargs) -> bool:
         """
-        Remove a symbol-interval pair from the trading orchestrator.
+        Change the strategy for an existing symbol-interval pair.
         
         Args:
             symbol (str): Trading symbol
             interval (str): Timeframe interval
+            strategy_type (str): Strategy type identifier
+            **kwargs: Additional parameters for the strategy
             
         Returns:
             bool: True if successful, False otherwise
         """
+        if not self.client:
+            logger.error("Client not initialized. Call initialize() first.")
+            return False
+        
         key = f"{symbol}_{interval}"
         if key not in self.components:
             logger.warning(f"{key} not found in the components")
             return False
         
         try:
-            # Remove the components
-            del self.components[key]
-            logger.info(f"Removed {key} from the components")
-            
-            # Check if the symbol and interval are used by other components
-            symbol_used = False
-            interval_used = False
-            
-            for k in self.components.keys():
-                s, i = k.split('_')
-                if s == symbol:
-                    symbol_used = True
-                if i == interval:
-                    interval_used = True
-            
-            # Remove symbol and interval from the lists if not used by other components
-            if not symbol_used and symbol in self.symbols:
-                self.symbols.remove(symbol)
-            if not interval_used and interval in self.intervals:
-                self.intervals.remove(interval)
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error removing {key}: {e}", exc_info=True)
-            return False
-    
-    def backtest(self, symbol: str, interval: str, start_date: str, end_date: str) -> Optional[Dict]:
-        """
-        Backtest the strategy for a specific symbol and interval.
-        
-        Args:
-            symbol (str): Trading symbol
-            interval (str): Timeframe interval
-            start_date (str): Start date for backtesting (format: 'YYYY-MM-DD')
-            end_date (str): End date for backtesting (format: 'YYYY-MM-DD')
-            
-        Returns:
-            Dict: Backtesting results
-        """
-        if not self.client:
-            logger.error("Client not initialized. Call initialize() first.")
-            return None
-        
-        try:
-            # Create a temporary strategy for backtesting
-            strategy = BTCStrategy(self.client, symbol, interval)
-            
-            # Get historical data
-            klines = self.client.get_historical_klines(
-                symbol=symbol,
-                interval=interval,
-                start_str=start_date,
-                end_str=end_date
+            # Create the new strategy
+            strategy = StrategyFactory.create_strategy(
+                strategy_type, 
+                self.client, 
+                symbol, 
+                interval, 
+                **kwargs
             )
             
-            import pandas as pd
-            data = pd.DataFrame(klines, columns=[
-                'timestamp', 'open', 'high', 'low', 'close', 'volume',
-                'close_time', 'quote_asset_volume', 'trades',
-                'taker_buy_base', 'taker_buy_quote', 'ignored'
-            ])
-            data = data.astype(float)
+            if strategy is None:
+                logger.error(f"Failed to create strategy for {key}")
+                return False
             
-            # Calculate indicators
-            data = strategy.indicators.calculate_all(data)
+            # Get existing components
+            execution_engine = self.components[key]["execution_engine"]
+            risk_management = self.components[key]["risk_management"]
             
-            # Generate signals
-            for i in range(1, len(data)):
-                if data['close'].iloc[i] > data['ema'].iloc[i] and data['rsi'].iloc[i] > 50:
-                    data.loc[data.index[i], 'signal'] = 1.0  # Buy signal
-                elif data['close'].iloc[i] < data['ema'].iloc[i] and data['rsi'].iloc[i] < 50:
-                    data.loc[data.index[i], 'signal'] = -1.0  # Sell signal
-                else:
-                    data.loc[data.index[i], 'signal'] = 0.0  # No signal
+            # Update the strategy
+            execution_engine.strategy = strategy
+            risk_management.strategy = strategy
             
-            # Calculate returns
-            data['position'] = data['signal'].shift(1).fillna(0)
-            data['returns'] = data['close'].pct_change() * data['position']
+            # Update the components dictionary
+            self.components[key]["strategy"] = strategy
             
-            # Calculate metrics
-            total_return = data['returns'].sum()
-            sharpe_ratio = data['returns'].mean() / data['returns'].std() * (252 ** 0.5)  # Annualized Sharpe ratio
-            max_drawdown = (data['returns'].cumsum() - data['returns'].cumsum().cummax()).min()
-            
-            # Summarize results
-            results = {
-                'symbol': symbol,
-                'interval': interval,
-                'start_date': start_date,
-                'end_date': end_date,
-                'total_return': total_return,
-                'sharpe_ratio': sharpe_ratio,
-                'max_drawdown': max_drawdown,
-                'num_trades': (data['signal'] != 0).sum(),
-                'data': data
-            }
-            
-            logger.info(f"Backtesting completed for {symbol}_{interval}")
-            return results
-            
+            logger.info(f"Changed strategy for {key} to {strategy_type}")
+            return True
         except Exception as e:
-            logger.error(f"Error during backtesting: {e}", exc_info=True)
-            return None
-
-
-if __name__ == "__main__":
-    import os
-    import logging.config
-    
-    # Configure logging
-    logging.config.dictConfig({
-        'version': 1,
-        'formatters': {
-            'standard': {
-                'format': LOGGING_CONFIG['format']
-            },
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'level': LOGGING_CONFIG['level'],
-                'formatter': 'standard',
-                'stream': 'ext://sys.stdout'
-            },
-            'file': {
-                'class': 'logging.FileHandler',
-                'level': LOGGING_CONFIG['level'],
-                'formatter': 'standard',
-                'filename': LOGGING_CONFIG['log_file'],
-                'mode': 'a',
-            }
-        },
-        'loggers': {
-            '': {  # root logger
-                'handlers': ['console', 'file'] if LOGGING_CONFIG['log_to_file'] else ['console'],
-                'level': LOGGING_CONFIG['level'],
-                'propagate': True
-            }
-        }
-    })
-    
-    # Get API credentials from environment variables
-    api_key = os.getenv("BINANCE_API_KEY")
-    api_secret = os.getenv("BINANCE_API_SECRET")
-    
-    if not api_key or not api_secret:
-        logger.error("API credentials not found in environment variables")
-        exit(1)
-    
-    # Initialize the trading orchestrator
-    orchestrator = TradingOrchestrator(api_key, api_secret)
-    
-    if orchestrator.initialize():
-        try:
-            # Print account balance
-            balance = orchestrator.get_account_balance()
-            logger.info(f"Account balance: {balance} USDT")
-            
-            # Start trading
-            orchestrator.start_trading()
-            
-        except KeyboardInterrupt:
-            logger.info("Trading stopped by user")
-            orchestrator.stop_trading()
-        except Exception as e:
-            logger.error(f"An error occurred: {e}", exc_info=True)
-            orchestrator.stop_trading()
-    else:
-        logger.error("Failed to initialize trading orchestrator")
+            logger.error(f"Error changing strategy: {e}", exc_info=True)
+            return False
