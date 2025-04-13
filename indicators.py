@@ -4,26 +4,32 @@ from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
 from ta.volatility import AverageTrueRange
 from ta.volume import VolumeWeightedAveragePrice
+from config import INDICATOR_CONFIG
 
 logger = logging.getLogger(__name__)
 
 class TechnicalIndicators:
     """Class for calculating various technical indicators for trading."""
     
-    def __init__(self, ema_window=14, rsi_window=14, atr_window=14, vwap_window=14):
+    def __init__(self, ema_window=None, rsi_window=None, atr_window=None, vwap_window=None):
         """
         Initialize the indicators with configurable window parameters.
         
         Args:
-            ema_window (int): Window period for EMA calculation
-            rsi_window (int): Window period for RSI calculation
-            atr_window (int): Window period for ATR calculation
-            vwap_window (int): Window period for VWAP calculation
+            ema_window (int, optional): Window period for EMA calculation. 
+                                       Defaults to config value if None.
+            rsi_window (int, optional): Window period for RSI calculation. 
+                                       Defaults to config value if None.
+            atr_window (int, optional): Window period for ATR calculation. 
+                                       Defaults to config value if None.
+            vwap_window (int, optional): Window period for VWAP calculation. 
+                                        Defaults to config value if None.
         """
-        self.ema_window = ema_window
-        self.rsi_window = rsi_window
-        self.atr_window = atr_window
-        self.vwap_window = vwap_window
+        # Use provided parameters or defaults from config
+        self.ema_window = ema_window if ema_window else INDICATOR_CONFIG["ema_window"]
+        self.rsi_window = rsi_window if rsi_window else INDICATOR_CONFIG["rsi_window"]
+        self.atr_window = atr_window if atr_window else INDICATOR_CONFIG["atr_window"]
+        self.vwap_window = vwap_window if vwap_window else INDICATOR_CONFIG["vwap_window"]
     
     def calculate_ema(self, data):
         """
@@ -134,24 +140,3 @@ class TechnicalIndicators:
             data = self.calculate_atr(data)
             data = self.calculate_vwap(data)
         return data
-
-
-if __name__ == "__main__":
-    # Example usage
-    import numpy as np
-    
-    # Generate sample data
-    dates = pd.date_range('2023-01-01', periods=100)
-    data = pd.DataFrame({
-        'timestamp': dates,
-        'open': np.random.normal(100, 5, 100),
-        'high': np.random.normal(102, 5, 100),
-        'low': np.random.normal(98, 5, 100),
-        'close': np.random.normal(101, 5, 100),
-        'volume': np.random.normal(1000, 200, 100)
-    })
-    
-    # Calculate indicators
-    indicators = TechnicalIndicators()
-    result = indicators.calculate_all(data)
-    print(result.tail())
