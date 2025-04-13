@@ -47,6 +47,16 @@ STRATEGY_CONFIG = {
     "volatility_decrease_factor": 0.7,  # ATR decrease that might signal a reversal
 }
 
+# Strategy Configuration
+STRATEGY_TYPES = {
+    "btc": "Bitcoin strategy with EMA, RSI, ATR, and VWAP",
+    "ema_cross": "EMA crossover strategy",
+    "macd": "MACD strategy",
+}
+
+# Default strategy type
+TRADING_CONFIG["default_strategy_type"] = "btc"
+
 # Risk Management Parameters
 RISK_CONFIG = {
     "max_risk_per_trade": 0.01,  # 1% of account balance per trade
