@@ -1,7 +1,9 @@
+# execution_engine.py
 import logging
 from binance.client import Client
-from btcstrategy import BTCStrategy
+from typing import Optional
 import pandas as pd
+from strategy_factory import Strategy  # Fixed import to use the abstract Strategy class
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +12,15 @@ class TradeExecutionError(Exception):
     pass
 
 class ExecutionEngine:
-    def __init__(self, client: Client, strategy: BTCStrategy, quantity: float):
+    def __init__(self, client: Client, strategy: Strategy, quantity: float):
+        """
+        Initialize the execution engine.
+        
+        Args:
+            client (Client): Binance API client
+            strategy (Strategy): Trading strategy to execute
+            quantity (float): Trade quantity
+        """
         self.client = client
         self.strategy = strategy
         self.quantity = quantity
