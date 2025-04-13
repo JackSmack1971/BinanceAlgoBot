@@ -3,34 +3,50 @@ import pandas as pd
 from binance.client import Client
 from data_feed import DataFeed
 from indicators import TechnicalIndicators
+from config import INDICATOR_CONFIG, STRATEGY_CONFIG, BINANCE_CONSTANTS
 
 logger = logging.getLogger(__name__)
 
 class BTCStrategy:
-    def __init__(self, client: Client, symbol: str, interval: str, 
-                 ema_window=14, rsi_window=14, atr_window=14, vwap_window=14):
+    def __init__(self, client: Client, symbol: str = None, interval: str = None,
+                 ema_window: int = None, rsi_window: int = None, 
+                 atr_window: int = None, vwap_window: int = None):
         """
         Initialize the BTC trading strategy.
         
         Args:
             client (Client): Binance API client
-            symbol (str): Trading symbol (e.g., 'BTCUSDT')
-            interval (str): Timeframe interval (e.g., '15m')
-            ema_window (int): Window period for EMA
-            rsi_window (int): Window period for RSI
-            atr_window (int): Window period for ATR
-            vwap_window (int): Window period for VWAP
+            symbol (str, optional): Trading symbol (e.g., 'BTCUSDT'). 
+                                   Defaults to config value if None.
+            interval (str, optional): Timeframe interval (e.g., '15m'). 
+                                     Defaults to config value if None.
+            ema_window (int, optional): EMA window. Defaults to config value if None.
+            rsi_window (int, optional): RSI window. Defaults to config value if None.
+            atr_window (int, optional): ATR window. Defaults to config value if None.
+            vwap_window (int, optional): VWAP window. Defaults to config value if None.
         """
+        from config import TRADING_CONFIG
+        
         self.client = client
-        self.symbol = symbol
-        self.interval = interval
-        self.data_feed = DataFeed(client, symbol, interval)
+        self.symbol = symbol if symbol else TRADING_CONFIG["default_symbol"]
+        self.interval = interval if interval else BINANCE_CONSTANTS["KLINE_INTERVAL_15MINUTE"]
+        
+        # Use provided parameters or defaults from config
+        self.ema_window = ema_window if ema_window else INDICATOR_CONFIG["ema_window"]
+        self.rsi_window = rsi_window if rsi_window else INDICATOR_CONFIG["rsi_window"]
+        self.atr_window = atr_window if atr_window else INDICATOR_CONFIG["atr_window"]
+        self.vwap_window = vwap_window if vwap_window else INDICATOR_CONFIG["vwap_window"]
+        
+        # Initialize dependencies
+        self.data_feed = DataFeed(client, self.symbol, self.interval)
         self.indicators = TechnicalIndicators(
-            ema_window=ema_window,
-            rsi_window=rsi_window,
-            atr_window=atr_window,
-            vwap_window=vwap_window
+            ema_window=self.ema_window,
+            rsi_window=self.rsi_window,
+            atr_window=self.atr_window,
+            vwap_window=self.vwap_window
         )
+        
+        logger.info(f"Initialized BTCStrategy with symbol={self.symbol}, interval={self.interval}")
     
     def calculate_indicators(self):
         """
@@ -70,29 +86,36 @@ class BTCStrategy:
             # Initialize signal column with 0.0 (no signal/hold)
             data['signal'] = 0.0
             
+            # Get configuration values
+            rsi_buy = STRATEGY_CONFIG["rsi_buy_threshold"]
+            rsi_sell = STRATEGY_CONFIG["rsi_sell_threshold"]
+            volatility_increase = STRATEGY_CONFIG["volatility_increase_factor"]
+            volatility_decrease = STRATEGY_CONFIG["volatility_decrease_factor"]
+            rsi_oversold = INDICATOR_CONFIG["rsi_oversold"]
+            
             # Trading rules based on indicators
             for i in range(1, len(data)):
-                # Rule 1: Price crosses above VWAP and RSI is above 50 -> Buy signal
+                # Rule 1: Price crosses above VWAP and RSI is above threshold -> Buy signal
                 if (data['close'].iloc[i] > data['vwap'].iloc[i] and 
                     data['close'].iloc[i-1] <= data['vwap'].iloc[i-1] and 
-                    data['rsi'].iloc[i] > 50):
+                    data['rsi'].iloc[i] > rsi_buy):
                     data.loc[data.index[i], 'signal'] = 1.0
                 
-                # Rule 2: Price crosses below VWAP and RSI is below 50 -> Sell signal
+                # Rule 2: Price crosses below VWAP and RSI is below threshold -> Sell signal
                 elif (data['close'].iloc[i] < data['vwap'].iloc[i] and 
                       data['close'].iloc[i-1] >= data['vwap'].iloc[i-1] and 
-                      data['rsi'].iloc[i] < 50):
+                      data['rsi'].iloc[i] < rsi_sell):
                     data.loc[data.index[i], 'signal'] = -1.0
                 
                 # Rule 3: Price is above EMA, but ATR is increasing significantly -> Sell signal (volatility exit)
                 elif (data['close'].iloc[i] > data['ema'].iloc[i] and 
-                      data['atr'].iloc[i] > data['atr'].iloc[i-1] * 1.5):
+                      data['atr'].iloc[i] > data['atr'].iloc[i-1] * volatility_increase):
                     data.loc[data.index[i], 'signal'] = -1.0
                 
                 # Rule 4: Price is below EMA, but volatility is decreasing -> Buy signal (potential reversal)
                 elif (data['close'].iloc[i] < data['ema'].iloc[i] and 
-                      data['atr'].iloc[i] < data['atr'].iloc[i-1] * 0.7 and
-                      data['rsi'].iloc[i] > 30):
+                      data['atr'].iloc[i] < data['atr'].iloc[i-1] * volatility_decrease and
+                      data['rsi'].iloc[i] > rsi_oversold):
                     data.loc[data.index[i], 'signal'] = 1.0
             
             # Add a column for position to track the current position based on signals
@@ -121,8 +144,44 @@ class BTCStrategy:
 
 if __name__ == "__main__":
     import os
+    from config import LOGGING_CONFIG
+    import logging.config
+    
+    # Configure logging
+    logging.config.dictConfig({
+        'version': 1,
+        'formatters': {
+            'standard': {
+                'format': LOGGING_CONFIG['format']
+            },
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'level': LOGGING_CONFIG['level'],
+                'formatter': 'standard',
+                'stream': 'ext://sys.stdout'
+            },
+            'file': {
+                'class': 'logging.FileHandler',
+                'level': LOGGING_CONFIG['level'],
+                'formatter': 'standard',
+                'filename': LOGGING_CONFIG['log_file'],
+                'mode': 'a',
+            }
+        },
+        'loggers': {
+            '': {  # root logger
+                'handlers': ['console', 'file'] if LOGGING_CONFIG['log_to_file'] else ['console'],
+                'level': LOGGING_CONFIG['level'],
+                'propagate': True
+            }
+        }
+    })
+    
+    # Initialize the client and strategy
     client = Client(os.getenv("YOUR_API_KEY"), os.getenv("YOUR_API_SECRET"))
-    btc_strategy = BTCStrategy(client, "BTCUSDT", Client.KLINE_INTERVAL_15MINUTE)
+    btc_strategy = BTCStrategy(client)
     
     try:
         # Generate trading signals
@@ -143,4 +202,4 @@ if __name__ == "__main__":
             print(f"Sell signals: {sell_signals}")
             
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred in main: {e}", exc_info=True)
