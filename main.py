@@ -1,9 +1,11 @@
 import os
 import logging.config
 import argparse
+from datetime import datetime
 from binance.client import Client
 from strategy_factory import StrategyFactory
 from trading_orchestrator import TradingOrchestrator
+from backtester import Backtester
 from config import LOGGING_CONFIG, STRATEGY_TYPES
 
 def configure_logging():
@@ -43,8 +45,8 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Binance Algorithmic Trading Bot')
     
-    parser.add_argument('--mode', choices=['live', 'backtest'], default='backtest',
-                        help='Trading mode: live or backtest (default: backtest)')
+    parser.add_argument('--mode', choices=['live', 'backtest', 'compare'], default='backtest',
+                        help='Trading mode: live, backtest, or compare (default: backtest)')
     
     parser.add_argument('--symbol', type=str, default='BTCUSDT',
                         help='Trading symbol (default: BTCUSDT)')
@@ -61,7 +63,189 @@ def parse_args():
     parser.add_argument('--backtest-end', type=str, default='2023-12-31',
                         help='End date for backtesting (format: YYYY-MM-DD) (default: 2023-12-31)')
     
+    parser.add_argument('--initial-capital', type=float, default=10000.0,
+                        help='Initial capital for backtesting (default: 10000.0)')
+    
+    parser.add_argument('--commission', type=float, default=0.001,
+                        help='Commission rate per trade (default: 0.001 = 0.1%%)')
+    
+    parser.add_argument('--output-dir', type=str, default='backtest_results',
+                        help='Directory to save backtest results (default: backtest_results)')
+    
+    parser.add_argument('--compare-strategies', type=str, nargs='+',
+                        help='List of strategies to compare (space-separated)')
+    
     return parser.parse_args()
+
+def run_backtest(client, args):
+    """
+    Run backtest with the specified parameters.
+    
+    Args:
+        client (Client): Binance API client
+        args (Namespace): Command line arguments
+        
+    Returns:
+        Dict[str, Any]: Backtest results
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Create strategy using the factory
+    strategy = StrategyFactory.create_strategy(
+        args.strategy, 
+        client, 
+        args.symbol, 
+        args.interval
+    )
+    
+    if strategy is None:
+        logger.error(f"Failed to create strategy: {args.strategy}")
+        return None
+    
+    # Create backtester
+    backtester = Backtester(client, strategy)
+    
+    # Run backtest
+    print(f"\nRunning backtest for {args.symbol} on {args.interval} timeframe using {args.strategy} strategy")
+    print(f"Period: {args.backtest_start} to {args.backtest_end}")
+    print(f"Initial capital: ${args.initial_capital}")
+    print(f"Commission rate: {args.commission * 100}%")
+    
+    results = backtester.run(
+        start_date=args.backtest_start,
+        end_date=args.backtest_end,
+        initial_capital=args.initial_capital,
+        commission=args.commission
+    )
+    
+    if not results['success']:
+        logger.error(f"Backtest failed: {results.get('message', 'Unknown error')}")
+        return None
+    
+    # Add strategy information to results
+    results['strategy_name'] = args.strategy
+    results['symbol'] = args.symbol
+    results['interval'] = args.interval
+    
+    # Ensure output directory exists
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Generate timestamp for filenames
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    base_filename = f"{args.symbol}_{args.interval}_{args.strategy}_{timestamp}"
+    
+    # Save results to files
+    report_file = os.path.join(args.output_dir, f"{base_filename}_report.md")
+    plot_file = os.path.join(args.output_dir, f"{base_filename}_plot.png")
+    
+    # Generate and save report
+    backtester.generate_report(results, report_file)
+    
+    # Plot and save results
+    backtester.plot_results(results, plot_file)
+    
+    # Print summary
+    metrics = results['metrics']
+    print("\nBacktest Results Summary:")
+    print(f"Total Return: {metrics['total_return_pct']:.2f}%")
+    print(f"Annual Return: {metrics['annual_return_pct']:.2f}%")
+    print(f"Max Drawdown: {metrics['max_drawdown_pct']:.2f}%")
+    print(f"Sharpe Ratio: {metrics['sharpe_ratio']:.2f}")
+    print(f"Total Trades: {metrics['total_trades']}")
+    print(f"Win Rate: {metrics['win_rate_pct']:.2f}%")
+    print(f"Profit Factor: {metrics['profit_factor']:.2f}")
+    
+    print(f"\nDetailed report saved to: {report_file}")
+    print(f"Plot saved to: {plot_file}")
+    
+    return results
+
+def compare_strategies(client, args):
+    """
+    Compare multiple strategies.
+    
+    Args:
+        client (Client): Binance API client
+        args (Namespace): Command line arguments
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Get list of strategies to compare
+    strategies = args.compare_strategies if args.compare_strategies else list(STRATEGY_TYPES.keys())
+    
+    print(f"\nComparing strategies: {', '.join(strategies)}")
+    print(f"Symbol: {args.symbol}")
+    print(f"Interval: {args.interval}")
+    print(f"Period: {args.backtest_start} to {args.backtest_end}")
+    
+    # List to store backtest results
+    backtest_results = []
+    
+    # Run backtest for each strategy
+    for strategy_type in strategies:
+        if strategy_type not in STRATEGY_TYPES:
+            logger.warning(f"Unknown strategy type: {strategy_type}")
+            continue
+        
+        # Create strategy using the factory
+        strategy = StrategyFactory.create_strategy(
+            strategy_type, 
+            client, 
+            args.symbol, 
+            args.interval
+        )
+        
+        if strategy is None:
+            logger.error(f"Failed to create strategy: {strategy_type}")
+            continue
+        
+        # Create backtester
+        backtester = Backtester(client, strategy)
+        
+        # Run backtest
+        print(f"\nRunning backtest for {strategy_type} strategy...")
+        
+        results = backtester.run(
+            start_date=args.backtest_start,
+            end_date=args.backtest_end,
+            initial_capital=args.initial_capital,
+            commission=args.commission
+        )
+        
+        if not results['success']:
+            logger.error(f"Backtest failed for {strategy_type}: {results.get('message', 'Unknown error')}")
+            continue
+        
+        # Add strategy information to results
+        results['strategy_name'] = strategy_type
+        results['symbol'] = args.symbol
+        results['interval'] = args.interval
+        
+        # Add to list of results
+        backtest_results.append(results)
+        
+        # Print brief summary
+        metrics = results['metrics']
+        print(f"  - Total Return: {metrics['total_return_pct']:.2f}%")
+        print(f"  - Sharpe Ratio: {metrics['sharpe_ratio']:.2f}")
+        print(f"  - Win Rate: {metrics['win_rate_pct']:.2f}%")
+    
+    if not backtest_results:
+        logger.error("No successful backtest results to compare")
+        return
+    
+    # Ensure output directory exists
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Generate timestamp for filenames
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    base_filename = f"comparison_{args.symbol}_{args.interval}_{timestamp}"
+    
+    # Save comparison report
+    comparison_file = os.path.join(args.output_dir, f"{base_filename}_comparison.md")
+    Backtester.compare_strategies(backtest_results, comparison_file)
+    
+    print(f"\nStrategy comparison report saved to: {comparison_file}")
 
 def main():
     """Main entry point for the application."""
@@ -81,106 +265,43 @@ def main():
         print("Please set BINANCE_API_KEY and BINANCE_API_SECRET environment variables.")
         return 1
     
-    # Initialize the trading orchestrator
-    orchestrator = TradingOrchestrator(api_key, api_secret, [args.symbol], [args.interval])
-    
-    if not orchestrator.initialize():
-        logger.error("Failed to initialize trading orchestrator")
-        return 1
+    # Initialize the Binance client
+    from config import API_CONFIG
+    if API_CONFIG["use_testnet"]:
+        client = Client(api_key, api_secret, testnet=True)
+        logger.info("Using Binance testnet")
+    else:
+        client = Client(api_key, api_secret)
+        logger.info("Using Binance production API")
     
     # Display available strategies
     print("\nAvailable Strategies:")
     for strategy_type, description in STRATEGY_TYPES.items():
         print(f"  - {strategy_type}: {description}")
     
-    # If the selected strategy is not the default, change it
-    if args.strategy != 'btc':
-        logger.info(f"Changing strategy to {args.strategy}")
-        success = orchestrator.change_strategy(args.symbol, args.interval, args.strategy)
-        if not success:
-            logger.error(f"Failed to change strategy to {args.strategy}")
+    # Handle different modes
+    if args.mode == 'live':
+        # Initialize the trading orchestrator
+        orchestrator = TradingOrchestrator(api_key, api_secret, [args.symbol], [args.interval])
+        
+        if not orchestrator.initialize():
+            logger.error("Failed to initialize trading orchestrator")
             return 1
-    
-    # Print account balance
-    balance = orchestrator.get_account_balance()
-    if balance is not None:
-        print(f"\nAccount balance: {balance} USDT")
-    
-    if args.mode == 'backtest':
-        print(f"\nRunning backtest for {args.symbol} on {args.interval} timeframe using {args.strategy} strategy")
-        print(f"Period: {args.backtest_start} to {args.backtest_end}")
         
-        results = orchestrator.backtest(args.symbol, args.interval, args.backtest_start, args.backtest_end)
+        # If the selected strategy is not the default, change it
+        if args.strategy != 'btc':
+            logger.info(f"Changing strategy to {args.strategy}")
+            success = orchestrator.change_strategy(args.symbol, args.interval, args.strategy)
+            if not success:
+                logger.error(f"Failed to change strategy to {args.strategy}")
+                return 1
         
-        if results:
-            print("\nBacktest Results:")
-            print(f"Total Return: {results['total_return']:.2%}")
-            print(f"Sharpe Ratio: {results['sharpe_ratio']:.2f}")
-            print(f"Maximum Drawdown: {results['max_drawdown']:.2%}")
-            print(f"Number of Trades: {results['num_trades']}")
-            
-            # Plot results if matplotlib is available
-            try:
-                import matplotlib.pyplot as plt
-                import numpy as np
-                
-                # Calculate cumulative returns
-                cum_returns = (1 + results['data']['returns']).cumprod() - 1
-                
-                # Create figure and axis
-                fig, ax1 = plt.subplots(figsize=(12, 8))
-                
-                # Plot price and indicators
-                ax1.set_title(f"{args.symbol} {args.interval} - {args.strategy} Strategy Backtest")
-                ax1.set_xlabel('Date')
-                ax1.set_ylabel('Price', color='black')
-                ax1.plot(results['data'].index, results['data']['close'], color='black', alpha=0.5, label='Price')
-                
-                # Plot buy and sell signals
-                buy_signals = results['data'][results['data']['signal'] == 1.0]
-                sell_signals = results['data'][results['data']['signal'] == -1.0]
-                
-                ax1.scatter(buy_signals.index, buy_signals['close'], marker='^', color='green', label='Buy', alpha=1)
-                ax1.scatter(sell_signals.index, sell_signals['close'], marker='v', color='red', label='Sell', alpha=1)
-                
-                # Plot strategy indicators based on the strategy type
-                if args.strategy == 'btc':
-                    ax1.plot(results['data'].index, results['data']['ema'], color='blue', label='EMA')
-                    ax1.plot(results['data'].index, results['data']['vwap'], color='purple', label='VWAP')
-                elif args.strategy == 'ema_cross':
-                    ax1.plot(results['data'].index, results['data']['fast_ema'], color='blue', label='Fast EMA')
-                    ax1.plot(results['data'].index, results['data']['slow_ema'], color='orange', label='Slow EMA')
-                elif args.strategy == 'macd':
-                    ax1.plot(results['data'].index, results['data']['close'], color='black', alpha=0.5, label='Price')
-                
-                ax1.legend(loc='upper left')
-                ax1.grid(True, alpha=0.3)
-                
-                # Create a secondary y-axis for returns
-                ax2 = ax1.twinx()
-                ax2.set_ylabel('Cumulative Returns', color='green')
-                ax2.plot(results['data'].index, cum_returns, color='green', linestyle='--', label='Returns')
-                ax2.tick_params(axis='y', labelcolor='green')
-                
-                # If MACD strategy, add a third y-axis for MACD
-                if args.strategy == 'macd':
-                    ax3 = ax1.twinx()
-                    ax3.spines['right'].set_position(('outward', 60))
-                    ax3.set_ylabel('MACD', color='blue')
-                    ax3.plot(results['data'].index, results['data']['macd'], color='blue', label='MACD')
-                    ax3.plot(results['data'].index, results['data']['macd_signal'], color='red', label='Signal')
-                    ax3.bar(results['data'].index, results['data']['macd_diff'], color='gray', alpha=0.3, label='Histogram')
-                    ax3.tick_params(axis='y', labelcolor='blue')
-                    ax3.legend(loc='lower right')
-                
-                plt.tight_layout()
-                plt.savefig(f"{args.symbol}_{args.interval}_{args.strategy}_backtest.png")
-                print(f"\nBacktest chart saved as {args.symbol}_{args.interval}_{args.strategy}_backtest.png")
-                
-            except ImportError:
-                print("\nMatplotlib not installed. Install it to generate backtest charts.")
-                
-    else:  # Live trading
+        # Print account balance
+        balance = orchestrator.get_account_balance()
+        if balance is not None:
+            print(f"\nAccount balance: {balance} USDT")
+        
+        # Start live trading
         print(f"\nStarting live trading for {args.symbol} on {args.interval} timeframe using {args.strategy} strategy")
         print("Press Ctrl+C to stop")
         
@@ -192,6 +313,14 @@ def main():
         except Exception as e:
             logger.error(f"An error occurred: {e}", exc_info=True)
             orchestrator.stop_trading()
+    
+    elif args.mode == 'backtest':
+        # Run backtest
+        run_backtest(client, args)
+    
+    elif args.mode == 'compare':
+        # Compare strategies
+        compare_strategies(client, args)
     
     return 0
 
