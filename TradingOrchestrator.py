@@ -1,3 +1,4 @@
+# TradingOrchestrator.py
 import logging
 import time
 from typing import Dict, List, Optional
@@ -270,3 +271,65 @@ class TradingOrchestrator:
         except Exception as e:
             logger.error(f"Error changing strategy: {e}", exc_info=True)
             return False
+            
+    def get_account_balance(self):
+        """
+        Get the current account balance.
+        
+        Returns:
+            float: Available balance in USDT or None if there was an error
+        """
+        if not self.client:
+            logger.error("Client not initialized. Call initialize() first.")
+            return None
+            
+        try:
+            account_info = self.client.get_account()
+            balances = {asset['asset']: float(asset['free']) for asset in account_info['balances'] 
+                       if float(asset['free']) > 0}
+            
+            # Return USDT balance as the default
+            return balances.get('USDT', 0.0)
+            
+        except Exception as e:
+            logger.error(f"Error getting account balance: {e}", exc_info=True)
+            return None
+            
+    def stop_trading(self):
+        """
+        Stop the trading process gracefully.
+        """
+        if not self.is_running:
+            logger.warning("Trading is not running")
+            return
+            
+        try:
+            logger.info("Stopping trading process")
+            self.is_running = False
+            
+            # Cancel any open orders
+            for key, components in self.components.items():
+                try:
+                    # Get the symbol from the key
+                    symbol = key.split('_')[0]
+                    
+                    # Cancel open orders for the symbol
+                    open_orders = self.client.get_open_orders(symbol=symbol)
+                    
+                    if open_orders:
+                        logger.info(f"Cancelling {len(open_orders)} open orders for {symbol}")
+                        
+                        for order in open_orders:
+                            self.client.cancel_order(
+                                symbol=symbol,
+                                orderId=order['orderId']
+                            )
+                            logger.info(f"Cancelled order {order['orderId']} for {symbol}")
+                    
+                except Exception as e:
+                    logger.error(f"Error cancelling orders for {key}: {e}", exc_info=True)
+            
+            logger.info("Trading stopped successfully")
+            
+        except Exception as e:
+            logger.error(f"Error stopping trading: {e}", exc_info=True)
