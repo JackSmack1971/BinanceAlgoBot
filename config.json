@@ -1,0 +1,6 @@
+{
+    "api_key": "your_api_key",
+    "secret_key": "your_secret_key",
+    "trade_symbol": "BTCUSDT",
+    "data_interval": "1m"
+}

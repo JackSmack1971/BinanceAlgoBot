@@ -1,7 +1,7 @@
 import logging
 from binance.client import Client
 import pandas as pd
-from config import TRADING_CONFIG
+from config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class DataFeed:
         from config import BINANCE_CONSTANTS
         
         self.client = client
-        self.symbol = symbol if symbol else TRADING_CONFIG["default_symbol"]
+        self.symbol = symbol if symbol else get_config('default_symbol', "BTCUSDT")
         self.interval = interval if interval else BINANCE_CONSTANTS["KLINE_INTERVAL_15MINUTE"]
         
         logger.info(f"Initialized DataFeed with symbol={self.symbol}, interval={self.interval}")
@@ -51,4 +51,26 @@ class DataFeed:
         data.fillna(method='ffill', inplace=True)  # Handle missing data
         
         logger.debug(f"Retrieved {len(data)} data points")
+        
+        # Store data in the database
+        from database.market_data_repository import MarketDataRepository
+        market_data_repo = MarketDataRepository()
+        for index, row in data.iterrows():
+            market_data_repo.insert_market_data(
+                symbol=self.symbol,
+                interval=self.interval,
+                timestamp=row['timestamp'],
+                open=row['open'],
+                high=row['high'],
+                low=row['low'],
+                close=row['close'],
+                volume=row['volume'],
+                close_time=row['close_time'],
+                quote_asset_volume=row['quote_asset_volume'],
+                trades=row['trades'],
+                taker_buy_base=row['taker_buy_base'],
+                taker_buy_quote=row['taker_buy_quote'],
+                ignored=row['ignored']
+            )
+        
         return data
