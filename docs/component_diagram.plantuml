@@ -1,0 +1,46 @@
+@startuml
+!define RECT <<rectangle>>
+' Component Diagram
+
+component main [[main.py]] RECT
+component TradingOrchestrator
+component Backtester
+component StrategyFactory
+component Strategy
+component BTCStrategy
+component ExchangeInterface
+component BinanceClient
+component PositionManager
+component RiskManagement
+component DataFeed
+component PerformanceAnalyzer
+component ReportGenerator
+component VisualizationService
+database Database
+
+main -- TradingOrchestrator
+main -- Backtester
+main -- StrategyFactory
+
+TradingOrchestrator -- Strategy
+Backtester -- Strategy
+
+StrategyFactory -- Strategy
+Strategy <|-- BTCStrategy
+
+Strategy -- PositionManager
+Strategy -- ExchangeInterface
+ExchangeInterface <|-- BinanceClient
+
+Backtester -- PerformanceAnalyzer
+Backtester -- ReportGenerator
+Backtester -- VisualizationService
+
+DataFeed -- Database
+
+RiskManagement -- PositionManager
+
+PerformanceAnalyzer -- Database
+ReportGenerator -- Database
+
+@enduml

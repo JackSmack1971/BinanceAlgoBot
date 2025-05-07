@@ -1,0 +1,24 @@
+@startuml
+' Deployment Diagram
+
+node "Binance API" {
+    component "Market Data"
+}
+
+node "Trading Bot Application" {
+    component "Trading Bot" {
+        component "Backtester"
+        component "TradingOrchestrator"
+        component "Strategy"
+    }
+}
+
+node "Database Server" {
+    database "Trading Data" {
+    }
+}
+
+Trading Bot -- Binance API : Uses
+Trading Bot -- Trading Data : Stores/Retrieves
+
+@enduml

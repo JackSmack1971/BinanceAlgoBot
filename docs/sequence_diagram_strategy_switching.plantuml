@@ -1,0 +1,20 @@
+@startuml
+' Sequence Diagram - Strategy Switching Process
+
+participant User
+participant TradingOrchestrator
+participant StrategyFactory
+participant Strategy
+
+User -> TradingOrchestrator : Request Strategy Change
+activate TradingOrchestrator
+TradingOrchestrator -> StrategyFactory : Create New Strategy
+activate StrategyFactory
+StrategyFactory -> StrategyFactory : Create Strategy Instance
+StrategyFactory --> TradingOrchestrator : New Strategy
+deactivate StrategyFactory
+TradingOrchestrator -> TradingOrchestrator : Stop Current Strategy
+TradingOrchestrator -> TradingOrchestrator : Start New Strategy
+TradingOrchestrator --> User : Strategy Change Complete
+deactivate TradingOrchestrator
+@enduml

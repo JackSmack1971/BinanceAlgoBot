@@ -1,0 +1,54 @@
+@startuml
+' Entity Relationship Diagram
+
+entity strategies {
+  * id : INTEGER
+  --
+  name : VARCHAR(255)
+  description : TEXT
+  created_at : TIMESTAMP
+}
+
+entity risk_parameters {
+  * id : INTEGER
+  --
+  strategy_id : INTEGER
+  max_risk_per_trade : DECIMAL(20, 8)
+  max_open_trades : INTEGER
+  stop_loss_percentage : DECIMAL(20, 8)
+  take_profit_percentage : DECIMAL(20, 8)
+  version : INTEGER
+  created_at : TIMESTAMP
+}
+
+entity market_data {
+  * id : INTEGER
+  --
+  symbol : VARCHAR(255)
+  interval : VARCHAR(255)
+  timestamp : TIMESTAMP
+  open : DECIMAL(20, 8)
+  high : DECIMAL(20, 8)
+  low : DECIMAL(20, 8)
+  close : DECIMAL(20, 8)
+  volume : DECIMAL(20, 8)
+}
+
+entity backtest_results {
+    * id : INTEGER
+    --
+    strategy_id : INTEGER
+    start_date : DATE
+    end_date : DATE
+    initial_capital : DECIMAL(20, 8)
+    final_capital : DECIMAL(20, 8)
+    total_return : DECIMAL(20, 8)
+    max_drawdown : DECIMAL(20, 8)
+    sharpe_ratio : DECIMAL(20, 8)
+    created_at : TIMESTAMP
+}
+
+strategies ||--o{ risk_parameters : "defines"
+strategies ||--o{ backtest_results : "generates"
+
+@enduml

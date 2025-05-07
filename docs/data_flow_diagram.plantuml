@@ -1,0 +1,23 @@
+@startuml
+!define RECT <<rectangle>>
+' Data Flow Diagram
+
+rectangle "Backtest Execution" {
+    component BinanceAPI RECT
+    component BacktestExecutor RECT
+    component Strategy RECT
+    component PerformanceAnalyzer RECT
+    component ReportGenerator RECT
+    component VisualizationService RECT
+    database Database RECT
+
+    BinanceAPI -- BacktestExecutor : Fetch Historical Data
+    BacktestExecutor -- Strategy : Process Data & Generate Signals
+    Strategy -- PerformanceAnalyzer : Trading Signals & Positions
+    PerformanceAnalyzer -- ReportGenerator : Performance Metrics
+    PerformanceAnalyzer -- VisualizationService : Performance Data
+    PerformanceAnalyzer -- Database : Store Performance Metrics
+    ReportGenerator -- Database : Store Report Data
+}
+
+@enduml

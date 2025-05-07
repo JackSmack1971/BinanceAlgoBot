@@ -1,0 +1,47 @@
+@startuml
+' Sequence Diagram - Backtest Execution
+
+participant User
+participant Backtester
+participant BacktestExecutor
+participant Strategy
+participant PerformanceAnalyzer
+participant ReportGenerator
+participant VisualizationService
+participant Database
+
+User -> Backtester : Run Backtest
+activate Backtester
+Backtester -> BacktestExecutor : Run
+activate BacktestExecutor
+BacktestExecutor -> BinanceAPI : Fetch Historical Data
+activate BinanceAPI
+BinanceAPI --> BacktestExecutor : Historical Data
+deactivate BinanceAPI
+BacktestExecutor -> Strategy : Process Data & Generate Signals
+activate Strategy
+Strategy -> Strategy : Calculate Indicators
+Strategy -> Strategy : Generate Signals
+Strategy --> BacktestExecutor : Signals
+deactivate Strategy
+BacktestExecutor -> PerformanceAnalyzer : Analyze Performance
+activate PerformanceAnalyzer
+PerformanceAnalyzer -> PerformanceAnalyzer : Calculate Metrics
+PerformanceAnalyzer --> BacktestExecutor : Performance Results
+deactivate PerformanceAnalyzer
+BacktestExecutor -> ReportGenerator : Generate Report
+activate ReportGenerator
+ReportGenerator -> ReportGenerator : Create Report
+ReportGenerator --> BacktestExecutor : Report
+deactivate ReportGenerator
+BacktestExecutor -> VisualizationService : Plot Results
+activate VisualizationService
+VisualizationService -> VisualizationService : Create Plot
+VisualizationService --> BacktestExecutor : Plot
+deactivate VisualizationService
+BacktestExecutor -> Database : Store Results
+BacktestExecutor --> Backtester : Backtest Results
+deactivate BacktestExecutor
+Backtester --> User : Backtest Complete
+deactivate Backtester
+@enduml

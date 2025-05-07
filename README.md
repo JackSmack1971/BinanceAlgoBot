@@ -22,3 +22,19 @@ To install and run the project, you need to have Python installed on your machin
 git clone https://github.com/yourusername/yourrepository.git
 cd yourrepository
 pip install -r requirements.txt
+```
+
+### External Dependencies
+
+The project relies on the following external Python libraries:
+
+*   **numpy**: Used for numerical computations and array operations.
+*   **pandas**: Used for data analysis and manipulation.
+*   **python\_binance**: Used for interacting with the Binance API.
+*   **ta**: Used for technical analysis indicators.
+*   **psycopg2-binary**: Used for connecting to PostgreSQL database.
+*   **pytest**: Used for testing.
+*   **matplotlib**: Used for data visualization.
+*   **backtester**: Used for backtesting trading strategies.
+
+These dependencies are listed in the `requirements.txt` file.

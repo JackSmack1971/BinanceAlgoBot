@@ -1,0 +1,60 @@
+@startuml
+' Sequence Diagram - Live Trading Cycle
+
+participant User
+participant TradingOrchestrator
+participant ExchangeInterface
+participant Strategy
+participant PositionManager
+
+User -> TradingOrchestrator : Start Trading
+activate TradingOrchestrator
+TradingOrchestrator -> TradingOrchestrator : Initialize
+TradingOrchestrator -> ExchangeInterface : Fetch Market Data
+activate ExchangeInterface
+ExchangeInterface -> ExchangeInterface : Get Account Balance
+ExchangeInterface -> ExchangeInterface : Get Order Status
+ExchangeInterface --> TradingOrchestrator : Market Data
+deactivate ExchangeInterface
+TradingOrchestrator -> Strategy : Run
+activate Strategy
+Strategy -> Strategy : Calculate Indicators
+Strategy -> Strategy : Generate Signals
+Strategy --> TradingOrchestrator : Signals
+deactivate Strategy
+TradingOrchestrator -> PositionManager : Manage Position
+activate PositionManager
+PositionManager -> ExchangeInterface : Place Order
+activate ExchangeInterface
+ExchangeInterface --> PositionManager : Order Confirmation
+deactivate ExchangeInterface
+PositionManager --> TradingOrchestrator : Position Update
+deactivate PositionManager
+TradingOrchestrator --> User : Trading Update
+deactivate TradingOrchestrator
+
+loop Trading Cycle
+    TradingOrchestrator -> ExchangeInterface : Fetch Market Data
+    activate ExchangeInterface
+    ExchangeInterface --> TradingOrchestrator : Market Data
+    deactivate ExchangeInterface
+    TradingOrchestrator -> Strategy : Run
+    activate Strategy
+    Strategy -> Strategy : Calculate Indicators
+    Strategy -> Strategy : Generate Signals
+    Strategy --> TradingOrchestrator : Signals
+    deactivate Strategy
+    TradingOrchestrator -> PositionManager : Manage Position
+    activate PositionManager
+    PositionManager -> ExchangeInterface : Place Order
+    activate ExchangeInterface
+    ExchangeInterface --> PositionManager : Order Confirmation
+    deactivate ExchangeInterface
+    PositionManager --> TradingOrchestrator : Position Update
+    deactivate PositionManager
+    TradingOrchestrator --> User : Trading Update
+end
+
+User -> TradingOrchestrator : Stop Trading
+TradingOrchestrator -> TradingOrchestrator : Stop Trading
+@enduml
