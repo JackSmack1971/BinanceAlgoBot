@@ -1,10 +1,11 @@
 # TradingOrchestrator.py
 import logging
+import asyncio
 import time
 from typing import Dict, List, Optional
 from binance.client import Client
 
-from config import TRADING_CONFIG, RISK_CONFIG, LOGGING_CONFIG
+from config import get_config
 from execution_engine import ExecutionEngine
 from risk_management import RiskManagement
 from strategy_factory import StrategyFactory, Strategy
@@ -32,7 +33,7 @@ class TradingOrchestrator:
         
         # Use default symbol if none provided
         if symbols is None:
-            symbols = [TRADING_CONFIG["default_symbol"]]
+            symbols = [get_config('default_symbol', "BTCUSDT")]
         self.symbols = symbols
         
         # Use default interval if none provided
@@ -58,8 +59,7 @@ class TradingOrchestrator:
         """
         try:
             # Initialize Binance client
-            from config import API_CONFIG
-            if API_CONFIG["use_testnet"]:
+            if get_config('use_testnet', True):
                 self.client = Client(self.api_key, self.api_secret, testnet=True)
                 logger.info("Using Binance testnet")
             else:
@@ -67,8 +67,7 @@ class TradingOrchestrator:
                 logger.info("Using Binance production API")
             
             # Get the default strategy type from config
-            from config import TRADING_CONFIG
-            default_strategy_type = TRADING_CONFIG.get("default_strategy_type", "btc")
+            default_strategy_type = get_config("default_strategy_type", "btc")
             
             # Initialize components for each symbol-interval pair
             for symbol in self.symbols:
@@ -89,8 +88,8 @@ class TradingOrchestrator:
                         continue
                     
                     # Initialize components
-                    execution_engine = ExecutionEngine(self.client, strategy, TRADING_CONFIG["default_quantity"])
-                    risk_management = RiskManagement(self.client, strategy, execution_engine, RISK_CONFIG["max_risk_per_trade"])
+                    engine = ExecutionEngine(self.client, strategy, get_config("default_quantity", 0.001))
+                    risk_management = RiskManagement(self.client, strategy, engine, get_config("max_risk_per_trade", 0.01))
                     
                     # Store components in a dictionary
                     self.components[key] = {
@@ -108,56 +107,63 @@ class TradingOrchestrator:
             logger.error(f"Error initializing components: {e}", exc_info=True)
             return False
     
-    def start_trading(self):
+    async def start_trading(self):
         """
         Start the trading process for all configured symbols and intervals.
         """
         if not self.client:
             logger.error("Client not initialized. Call initialize() first.")
             return False
-        
+
         try:
             self.is_running = True
             logger.info("Starting trading process")
-            
+
             while self.is_running:
                 for key, components in self.components.items():
-                    try:
-                        # Get components
-                        strategy = components["strategy"]
-                        execution_engine = components["execution_engine"]
-                        risk_management = components["risk_management"]
-                        
-                        # Step 1: Update risk parameters
-                        logger.info(f"Managing risk for {key}")
-                        risk_management.manage_risk()
-                        
-                        # Step 2: Get trading signals
-                        logger.info(f"Generating signals for {key}")
-                        signals = strategy.run()
-                        
-                        if signals is not None and not signals.empty:
-                            # Step 3: Execute trades based on signals
-                            logger.info(f"Executing trades for {key}")
-                            execution_engine.execute_trades(signals)
-                        else:
-                            logger.warning(f"No signals generated for {key}")
-                    
-                    except Exception as e:
-                        logger.error(f"Error processing {key}: {e}", exc_info=True)
-                        # Continue with the next symbol-interval pair
-                        continue
-                
+                    await self._process_component(key, components)
+
                 # Sleep for a configured time before the next iteration
-                time.sleep(60)  # Check for new signals every minute
-                
+                await asyncio.sleep(60)  # Check for new signals every minute
+
             logger.info("Trading process stopped")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error in trading process: {e}", exc_info=True)
             self.is_running = False
             return False
+
+    async def _process_component(self, key: str, components: Dict):
+        """
+        Process a single component (strategy, execution engine, risk management) for a given symbol-interval pair.
+        """
+        try:
+            # Get components
+            strategy = components["strategy"]
+            execution_engine = components["execution_engine"]
+            risk_management = components["risk_management"]
+
+            # Step 1: Update risk parameters
+            logger.info(f"Managing risk for {key}")
+            risk_management.manage_risk()
+
+            # Step 2: Get trading signals
+            logger.info(f"Generating signals for {key}")
+            signals = strategy.run()
+
+            if signals is not None and not signals.empty:
+                # Step 3: Execute trades based on signals
+                logger.info(f"Executing trades for {key}")
+                execution_engine.execute_trades(signals)
+            else:
+                logger.warning(f"No signals generated for {key}")
+
+        except Exception as e:
+            logger.error(f"Error processing {key}: {e}", exc_info=True)
+            # Continue with the next symbol-interval pair
+            pass
+
     
     def add_strategy(self, symbol: str, interval: str, strategy_type: str, **kwargs) -> bool:
         """
@@ -196,8 +202,8 @@ class TradingOrchestrator:
                 return False
             
             # Initialize components
-            execution_engine = ExecutionEngine(self.client, strategy, TRADING_CONFIG["default_quantity"])
-            risk_management = RiskManagement(self.client, strategy, execution_engine, RISK_CONFIG["max_risk_per_trade"])
+            engine = ExecutionEngine(self.client, strategy, get_config("default_quantity", 0.001))
+            risk_management = RiskManagement(self.client, strategy, engine, get_config("max_risk_per_trade", 0.01))
             
             # Store components in the dictionary
             self.components[key] = {

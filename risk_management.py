@@ -65,11 +65,11 @@ class RiskManagement:
             
             # Apply position sizing constraints
             # 1. Round to appropriate decimal places for the asset
-            from config import TRADING_CONFIG
-            position_size = round(max_position_size, TRADING_CONFIG.get("quantity_precision", 5))
+            from config import get_config
+            position_size = round(max_position_size, get_config("quantity_precision", 5))
             
             # 2. Ensure minimum order size is met
-            min_order_size = TRADING_CONFIG.get("min_order_size", 0.001)
+            min_order_size = get_config("min_order_size", 0.001)
             position_size = max(position_size, min_order_size)
             
             # Update the quantity in the execution engine
@@ -92,7 +92,7 @@ class RiskManagement:
 # Only execute this if the script is run directly
 if __name__ == "__main__":
     import os
-    from config import TRADING_CONFIG, RISK_CONFIG
+    from config import get_config
     from strategy_factory import StrategyFactory
     
     # Initialize client
@@ -100,21 +100,21 @@ if __name__ == "__main__":
     
     # Create strategy
     strategy = StrategyFactory.create_strategy(
-        TRADING_CONFIG["default_strategy_type"],
+        get_config("default_strategy_type", "btc"),
         client,
-        TRADING_CONFIG["default_symbol"],
-        TRADING_CONFIG["default_interval"]
+        get_config("default_symbol", "BTCUSDT"),
+        get_config("default_interval", "15m")
     )
     
     # Initialize components
-    engine = ExecutionEngine(client, strategy, TRADING_CONFIG["default_quantity"])
-    risk_management = RiskManagement(client, strategy, engine, RISK_CONFIG["max_risk_per_trade"])
+    engine = ExecutionEngine(client, strategy, get_config("default_quantity", 0.001))
+    risk_management = RiskManagement(client, strategy, engine, get_config("max_risk_per_trade", 0.01))
     
     # Run risk management
     risk_details = risk_management.manage_risk()
     
     if risk_details:
         print(f"ATR: {risk_details['atr']}")
-        print(f"Available Balance: {risk_details['available_balance']} {TRADING_CONFIG['default_symbol'][3:]}")
+        print(f"Available Balance: {risk_details['available_balance']} {get_config('default_symbol', 'BTCUSDT')[3:]}")
         print(f"Risk Amount: {risk_details['risk_amount']}")
         print(f"Position Size: {risk_details['position_size']}")

@@ -7,7 +7,7 @@ from binance.client import Client
 from strategy_factory import StrategyFactory
 from trading_orchestrator import TradingOrchestrator
 from backtester import Backtester
-from config import LOGGING_CONFIG, STRATEGY_TYPES
+from config import get_config, STRATEGY_TYPES
 
 def configure_logging():
     """Configure logging based on the configuration."""
@@ -15,28 +15,28 @@ def configure_logging():
         'version': 1,
         'formatters': {
             'standard': {
-                'format': LOGGING_CONFIG['format']
+                'format': get_config('format', "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             },
         },
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
-                'level': LOGGING_CONFIG['level'],
+                'level': get_config('level', "INFO"),
                 'formatter': 'standard',
                 'stream': 'ext://sys.stdout'
             },
             'file': {
                 'class': 'logging.FileHandler',
-                'level': LOGGING_CONFIG['level'],
+                'level': get_config('level', "INFO"),
                 'formatter': 'standard',
-                'filename': LOGGING_CONFIG['log_file'],
+                'filename': get_config('log_file', "trading_bot.log"),
                 'mode': 'a',
             }
         },
         'loggers': {
             '': {  # root logger
-                'handlers': ['console', 'file'] if LOGGING_CONFIG['log_to_file'] else ['console'],
-                'level': LOGGING_CONFIG['level'],
+                'handlers': ['console', 'file'] if get_config('log_to_file', True) else ['console'],
+                'level': get_config('level', "INFO"),
                 'propagate': True
             }
         }
@@ -267,8 +267,8 @@ def main():
         return 1
     
     # Initialize the Binance client
-    from config import API_CONFIG
-    if API_CONFIG["use_testnet"]:
+    from config import get_config
+    if get_config('use_testnet', True):
         client = Client(api_key, api_secret, testnet=True)
         logger.info("Using Binance testnet")
     else:
