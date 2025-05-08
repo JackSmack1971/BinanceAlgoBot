@@ -5,8 +5,12 @@ from typing import Dict, Any, Optional, List, Type, Tuple
 from datetime import datetime
 from binance.client import Client
 
+from utils import handle_error
+
 from strategy_factory import Strategy
 from config import get_config
+from backtest_configuration import BacktestConfiguration
+from BacktestExecutor import BacktestExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -15,71 +19,67 @@ class Backtester:
     Class for backtesting trading strategies using historical data.
     """
 
-    def __init__(self, client: Client, strategy: Strategy, initial_capital: float = 10000.0, commission: float = 0.001):
+    from utils import handle_error
+
+    @handle_error
+    def __init__(self, config: BacktestConfiguration):
         """
         Initialize the backtester.
 
         Args:
-            client (Client): Binance API client
-            strategy (Strategy): Trading strategy to backtest
+            config (BacktestConfiguration): Backtest configuration object.
         """
-        self.client = client
-        self.strategy = strategy
-        self.initial_capital = initial_capital
-        self.commission = commission
-
-        self.backtest_executor = BacktestExecutor(client, strategy)
-        self.performance_analyzer = PerformanceAnalyzer(initial_capital, commission)
+        self.config = config
+        self.backtest_executor = BacktestExecutor(config)
+        self.performance_analyzer = PerformanceAnalyzer(config.initial_capital, config.commission)
         self.report_generator = ReportGenerator()
         self.visualization_service = VisualizationService()
 
-        logger.info(f"Initialized Backtester for {strategy.__class__.__name__} on {strategy.symbol}/{strategy.interval}")
+        logger.info(f"Initialized Backtester for {config.strategy.__class__.__name__} on {config.strategy.symbol}/{config.strategy.interval}")
 
-    def run(self, start_date: str, end_date: str) -> Dict[str, Any]:
+    def run(self) -> Dict[str, Any]:
         """
         Run the backtest for the specified period.
-
-        Args:
-            start_date (str): Start date for backtesting (format: 'YYYY-MM-DD')
-            end_date (str): End date for backtesting (format: 'YYYY-MM-DD')
 
         Returns:
             Dict[str, Any]: Backtesting results
         """
         try:
-            logger.info(f"Running backtest from {start_date} to {end_date}")
+            logger.info(f"Running backtest from {self.config.start_date} to {self.config.end_date}")
 
             # Execute the backtest
-            signals = self.backtest_executor.run(start_date, end_date)
+            signals = self.backtest_executor.run()
 
             if signals.empty:
-                logger.error(f"No signals generated for {self.strategy.symbol}")
+                logger.error(f"No signals generated for {self.config.strategy.symbol}")
                 return {
                     'success': False,
-                    'message': f"No signals generated for {self.strategy.symbol}"
+                    'message': f"No signals generated for {self.config.strategy.symbol}"
                 }
 
             # Analyze performance
             performance_results = self.performance_analyzer.calculate_performance(signals)
 
             if not performance_results:
-                logger.error(f"Error during performance analysis for {self.strategy.symbol}")
+                logger.error(f"Error during performance analysis for {self.config.strategy.symbol}")
                 return {
                     'success': False,
-                    'message': f"Error during performance analysis for {self.strategy.symbol}"
+                    'message': f"Error during performance analysis for {self.config.strategy.symbol}"
                 }
 
             performance_results['success'] = True
-            logger.info(f"Backtest completed for {self.strategy.symbol} from {start_date} to {end_date}")
+            logger.info(f"Backtest completed for {self.config.strategy.symbol} from {self.config.start_date} to {self.config.end_date}")
             return performance_results
 
         except Exception as e:
             logger.error(f"Error during backtesting: {e}", exc_info=True)
+            raise BaseTradingException(f"Error during backtesting: {e}") from e
             return {
                 'success': False,
                 'message': f"Error during backtesting: {str(e)}"
             }
 
+    @handle_error
     def plot_results(self, results: Dict[str, Any], filename: str = None) -> bool:
         """
         Plot the backtest results.
@@ -95,8 +95,9 @@ class Backtester:
             logger.error(f"Cannot plot results: {results['message']}")
             return False
 
-        return self.visualization_service.plot_results(results, self.strategy.__class__.__name__, self.strategy.symbol, self.strategy.interval, filename)
+        return self.visualization_service.plot_results(results, self.config.strategy.__class__.__name__, self.config.strategy.symbol, self.config.strategy.interval, filename)
 
+    @handle_error
     def generate_report(self, results: Dict[str, Any], filename: str = None) -> str:
         """
         Generate a detailed report of the backtest results.
@@ -111,9 +112,10 @@ class Backtester:
         if not results['success']:
             return f"Cannot generate report: {results['message']}"
 
-        return self.report_generator.generate_report(results, self.strategy.__class__.__name__, self.strategy.symbol, self.strategy.interval, filename)
+        return self.report_generator.generate_report(results, self.config.strategy.__class__.__name__, self.config.strategy.symbol, self.config.strategy.interval, filename)
 
     @staticmethod
+    @handle_error
     def compare_strategies(backtests: List[Dict[str, Any]], filename: str = None) -> Optional[str]:
         """
         Compare multiple backtesting results and generate a combined report.
@@ -156,4 +158,5 @@ class Backtester:
 
         except Exception as e:
             logger.error(f"Error generating comparison report: {e}", exc_info=True)
+            raise BaseTradingException(f"Error generating comparison report: {e}") from e
             return f"Error generating comparison report: {e}"

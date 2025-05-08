@@ -1,5 +1,14 @@
+from service.service_locator import ServiceLocator
+from service.performance_metrics_service import PerformanceMetricsServiceImpl
+from service.indicator_service import IndicatorServiceImpl
+from service.market_data_service import MarketDataServiceImpl
+
+# Register services
+service_locator = ServiceLocator()
+service_locator.register("PerformanceMetricsService", PerformanceMetricsServiceImpl())
+service_locator.register("IndicatorService", IndicatorServiceImpl())
+service_locator.register("MarketDataService", MarketDataServiceImpl())
 # main.py
-import os
 import logging.config
 import argparse
 from datetime import datetime
@@ -7,7 +16,8 @@ from binance.client import Client
 from strategy_factory import StrategyFactory
 from trading_orchestrator import TradingOrchestrator
 from backtester import Backtester
-from config import get_config, STRATEGY_TYPES
+from config import STRATEGY_TYPES
+from configuration_service import ConfigurationService
 
 def configure_logging():
     """Configure logging based on the configuration."""
@@ -248,8 +258,10 @@ def compare_strategies(client, args):
     
     print(f"\nStrategy comparison report saved to: {comparison_file}")
 
-def main():
-    """Main entry point for the application."""
+import asyncio
+
+async def async_main():
+    """Async main entry point for the application."""
     # Configure logging
     configure_logging()
     logger = logging.getLogger(__name__)
@@ -257,18 +269,14 @@ def main():
     # Parse command line arguments
     args = parse_args()
     
-    # Get API credentials from environment variables
-    api_key = os.getenv("BINANCE_API_KEY")
-    api_secret = os.getenv("BINANCE_API_SECRET")
-    
-    if not api_key or not api_secret:
-        logger.error("API credentials not found in environment variables")
-        print("Please set BINANCE_API_KEY and BINANCE_API_SECRET environment variables.")
-        return 1
+    # Initialize the configuration service
+    config_service = ConfigurationService()
     
     # Initialize the Binance client
-    from config import get_config
-    if get_config('use_testnet', True):
+    api_key = config_service.get_config('api_key')
+    api_secret = config_service.get_config('secret_key')
+    use_testnet = config_service.get_config('use_testnet', True)
+    if use_testnet:
         client = Client(api_key, api_secret, testnet=True)
         logger.info("Using Binance testnet")
     else:
@@ -283,7 +291,7 @@ def main():
     # Handle different modes
     if args.mode == 'live':
         # Initialize the trading orchestrator
-        orchestrator = TradingOrchestrator(api_key, api_secret, [args.symbol], [args.interval])
+        orchestrator = TradingOrchestrator(config_service, [args.symbol], [args.interval])
         
         if not orchestrator.initialize():
             logger.error("Failed to initialize trading orchestrator")
@@ -298,7 +306,7 @@ def main():
                 return 1
         
         # Print account balance
-        balance = orchestrator.get_account_balance()
+        balance = await orchestrator.get_account_balance()
         if balance is not None:
             print(f"\nAccount balance: {balance} USDT")
         
@@ -307,12 +315,13 @@ def main():
         print("Press Ctrl+C to stop")
         
         try:
-            orchestrator.start_trading()
+            await orchestrator.start_trading()
         except KeyboardInterrupt:
             print("\nTrading stopped by user")
             orchestrator.stop_trading()
         except Exception as e:
             logger.error(f"An error occurred: {e}", exc_info=True)
+            raise BaseTradingException(f"An error occurred: {e}") from e
             orchestrator.stop_trading()
     
     elif args.mode == 'backtest':
@@ -326,4 +335,4 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    exit(main())
+    exit(asyncio.run(async_main()))

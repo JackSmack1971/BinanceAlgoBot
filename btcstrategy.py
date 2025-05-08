@@ -17,28 +17,28 @@ if __name__ == "__main__":
         'version': 1,
         'formatters': {
             'standard': {
-                'format': get_config('format', "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+                'format': get_config('logging_format')
             },
         },
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
-                'level': get_config('level', "INFO"),
+                'level': get_config('logging_level'),
                 'formatter': 'standard',
                 'stream': 'ext://sys.stdout'
             },
             'file': {
                 'class': 'logging.FileHandler',
-                'level': get_config('level', "INFO"),
+                'level': get_config('logging_level'),
                 'formatter': 'standard',
-                'filename': get_config('log_file', "trading_bot.log"),
+                'filename': get_config('log_file'),
                 'mode': 'a',
             }
         },
         'loggers': {
             '': {  # root logger
-            'handlers': ['console', 'file'] if get_config('log_to_file', True) else ['console'],
-                'level': get_config('level', "INFO"),
+            'handlers': ['console', 'file'] if get_config('log_to_file') else ['console'],
+                'level': get_config('logging_level'),
                 'propagate': True
             }
         }
@@ -70,3 +70,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         logger.error(f"An error occurred in main: {e}", exc_info=True)
+        raise StrategyError(f"An error occurred in main: {e}") from e

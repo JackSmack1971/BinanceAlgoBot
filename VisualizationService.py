@@ -116,4 +116,5 @@ class VisualizationService:
 
         except Exception as e:
             logger.error(f"Error plotting results: {e}", exc_info=True)
+            raise BaseTradingException(f"Error plotting results: {e}") from e
             return False

@@ -1,23 +1,44 @@
-import psycopg2
+import asyncpg
 from config import DATABASE_URL
 
 class DatabaseConnection:
-    def __init__(self):
-        self.conn = None
+    def __init__(self, min_conn=1, max_conn=10):
+        self.conn_pool = None
+        self.min_conn = min_conn
+        self.max_conn = max_conn
 
-    def connect(self):
+    async def connect(self):
         try:
-            self.conn = psycopg2.connect(DATABASE_URL)
-            print("Database connection established.")
-        except psycopg2.Error as e:
-            print(f"Error connecting to the database: {e}")
+            self.conn_pool = await asyncpg.create_pool(DATABASE_URL, min_size=self.min_conn, max_size=self.max_conn)
+            print("Database connection pool established.")
+        except Exception as e:
+            logger.error(f"Error connecting to the database: {e}", exc_info=True)
+            raise DataError(f"Error connecting to the database: {e}") from e
 
-    def disconnect(self):
-        if self.conn:
-            self.conn.close()
-            print("Database connection closed.")
+    async def disconnect(self):
+        if self.conn_pool:
+            await self.conn_pool.close()
+            print("Database connection pool closed.")
 
-    def get_connection(self):
-        if not self.conn:
-            self.connect()
-        return self.conn
+    async def get_connection(self):
+        if not self.conn_pool:
+            await self.connect()
+        return await self.conn_pool.acquire()
+
+    async def release_connection(self, conn):
+        if self.conn_pool:
+            await self.conn_pool.release(conn)
+
+    async def execute_query(self, query, params=None):
+        conn = None
+        try:
+            conn = await self.get_connection()
+            result = await conn.fetch(query, *params) if params else await conn.fetch(query)
+            return result
+        except Exception as e:
+            logger.error(f"Error executing query: {e}", exc_info=True)
+            raise DataError(f"Error executing query: {e}") from e
+            raise
+        finally:
+            if conn:
+                await self.release_connection(conn)

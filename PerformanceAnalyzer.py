@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 from typing import Dict, Any
+from utils import handle_error
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +10,7 @@ class PerformanceAnalyzer:
     Calculates performance metrics for backtesting results.
     """
 
+    @handle_error
     def __init__(self, initial_capital: float = 10000.0, commission: float = 0.001):
         """
         Initializes the PerformanceAnalyzer with initial capital and commission rate.
@@ -71,8 +73,10 @@ class PerformanceAnalyzer:
             }
         except Exception as e:
             logger.error(f"Error during performance analysis: {e}", exc_info=True)
+            raise BaseTradingException(f"Error during performance analysis: {e}") from e
             return {}
 
+    @handle_error
     def _calculate_trades(self, results: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate individual trades and their statistics.
@@ -159,6 +163,7 @@ class PerformanceAnalyzer:
 
         return pd.DataFrame(trades)
 
+    @handle_error
     def _calculate_metrics(self, results: pd.DataFrame, trades: pd.DataFrame, initial_capital: float) -> Dict[str, Any]:
         """
         Calculate performance metrics for the backtest.
@@ -250,10 +255,11 @@ class PerformanceAnalyzer:
             metrics['profit_factor'] = 0
 
         # Store performance metrics in the database
-        from database.performance_metrics_repository import PerformanceMetricsRepository
-        performance_metrics_repo = PerformanceMetricsRepository()
+        from service.service_locator import ServiceLocator
+        service_locator = ServiceLocator()
+        performance_metrics_service = service_locator.get("PerformanceMetricsService")
         # Assuming you have trade_id available, replace 1 with the actual trade_id
-        performance_metrics_repo.insert_performance_metrics(
+        performance_metrics_service.insert_performance_metrics(
             trade_id=1,  # Replace with actual trade_id
             initial_capital=metrics['initial_capital'],
             final_capital=metrics['final_capital'],

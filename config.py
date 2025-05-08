@@ -6,12 +6,37 @@ providing a single source of truth for settings and making it easier to modify
 parameters without changing code in multiple files.
 """
 
-from configuration_service import ConfigurationService
+from configuration_service import TypedConfigurationService
 
-config_service = ConfigurationService('config.json')
+config_service = TypedConfigurationService('config.json')
 
-def get_config(key: str, default=None):
-    return config_service.get_config(key, default)
+config_service.declare_config('database_url', str, "postgresql://user:password@host:port/database")
+config_service.declare_config('use_testnet', bool, True)
+config_service.declare_config('default_symbol', str, "BTCUSDT")
+config_service.declare_config('default_interval', str, "15m")
+config_service.declare_config('default_quantity', float, 0.001)
+config_service.declare_config('ema_window', int, 14)
+config_service.declare_config('rsi_window', int, 14)
+config_service.declare_config('rsi_overbought', int, 70)
+config_service.declare_config('rsi_oversold', int, 30)
+config_service.declare_config('atr_window', int, 14)
+config_service.declare_config('atr_volatility_factor', float, 1.5)
+config_service.declare_config('vwap_window', int, 14)
+config_service.declare_config('rsi_buy_threshold', int, 50)
+config_service.declare_config('rsi_sell_threshold', int, 50)
+config_service.declare_config('volatility_increase_factor', float, 1.5)
+config_service.declare_config('volatility_decrease_factor', float, 0.7)
+config_service.declare_config('max_risk_per_trade', float, 0.01)
+config_service.declare_config('max_open_trades', int, 3)
+config_service.declare_config('stop_loss_percentage', float, 0.02)
+config_service.declare_config('take_profit_percentage', float, 0.04)
+config_service.declare_config('logging_level', str, "INFO")
+config_service.declare_config('logging_format', str, "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+config_service.declare_config('log_to_file', bool, True)
+config_service.declare_config('log_file', str, "trading_bot.log")
+
+def get_config(key: str):
+    return config_service.get_config(key)
 
 # Example usage:
 # api_key = get_config('api_key')

@@ -13,5 +13,6 @@ def handle_error(func):
             return func(*args, **kwargs)
         except Exception as e:
             logger.error(f"An error occurred in {func.__name__}: {e}", exc_info=True)
+            raise BaseTradingException(f"An error occurred in {func.__name__}: {e}") from e
             return None
     return wrapper

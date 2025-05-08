@@ -4,27 +4,25 @@ class RiskParametersRepository:
     def __init__(self):
         self.db_connection = DatabaseConnection()
 
-    def insert_risk_parameters(self, strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def __aenter__(self):
+        await self.db_connection.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db_connection.disconnect()
+
+    async def insert_risk_parameters(self, strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version):
         sql = """
             INSERT INTO risk_parameters (strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES ($1, $2, $3, $4, $5, $6)
         """
         values = (strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version)
-        cursor.execute(sql, values)
-        conn.commit()
-        cursor.close()
+        await self.db_connection.execute_query(sql, values)
 
-    def get_risk_parameters_by_strategy_id(self, strategy_id):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def get_risk_parameters_by_strategy_id(self, strategy_id):
         sql = """
             SELECT * FROM risk_parameters
-            WHERE strategy_id = %s
+            WHERE strategy_id = $1
         """
         values = (strategy_id,)
-        cursor.execute(sql, values)
-        results = cursor.fetchall()
-        cursor.close()
-        return results
+        return await self.db_connection.execute_query(sql, values)

@@ -5,11 +5,14 @@ from config import get_config
 
 logger = logging.getLogger(__name__)
 
-class DataRetrievalError(Exception):
+class DataRetrievalError(BaseTradingException):
     """Exception raised when there is an error retrieving data."""
     pass
 
+from utils import handle_error
+
 class DataFeed:
+    @handle_error
     def __init__(self, client: Client, symbol: str = None, interval: str = None):
         """
         Initialize the data feed.
@@ -24,7 +27,7 @@ class DataFeed:
         from config import BINANCE_CONSTANTS
         
         self.client = client
-        self.symbol = symbol if symbol else get_config('default_symbol', "BTCUSDT")
+        self.symbol = symbol if symbol else get_config('default_symbol')
         self.interval = interval if interval else BINANCE_CONSTANTS["KLINE_INTERVAL_15MINUTE"]
         
         logger.info(f"Initialized DataFeed with symbol={self.symbol}, interval={self.interval}")
@@ -44,6 +47,7 @@ class DataFeed:
             klines = self.client.get_klines(symbol=self.symbol, interval=self.interval)
         except Exception as e:
             logger.error(f"An error occurred: {e}", exc_info=True)
+            raise DataError(f"An error occurred: {e}") from e
             raise DataRetrievalError(f"Could not retrieve data for symbol {self.symbol} and interval {self.interval}") from e
 
         data = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
@@ -55,22 +59,27 @@ class DataFeed:
         # Store data in the database
         from database.market_data_repository import MarketDataRepository
         market_data_repo = MarketDataRepository()
+        
+        market_data_list = []
         for index, row in data.iterrows():
-            market_data_repo.insert_market_data(
-                symbol=self.symbol,
-                interval=self.interval,
-                timestamp=row['timestamp'],
-                open=row['open'],
-                high=row['high'],
-                low=row['low'],
-                close=row['close'],
-                volume=row['volume'],
-                close_time=row['close_time'],
-                quote_asset_volume=row['quote_asset_volume'],
-                trades=row['trades'],
-                taker_buy_base=row['taker_buy_base'],
-                taker_buy_quote=row['taker_buy_quote'],
-                ignored=row['ignored']
-            )
+            market_data = {
+                'symbol': self.symbol,
+                'interval': self.interval,
+                'timestamp': row['timestamp'],
+                'open': row['open'],
+                'high': row['high'],
+                'low': row['low'],
+                'close': row['close'],
+                'volume': row['volume'],
+                'close_time': row['close_time'],
+                'quote_asset_volume': row['quote_asset_volume'],
+                'trades': row['trades'],
+                'taker_buy_base': row['taker_buy_base'],
+                'taker_buy_quote': row['taker_buy_quote'],
+                'ignored': row['ignored']
+            }
+            market_data_list.append(market_data)
+        
+        market_data_repo.insert_market_data(market_data_list)
         
         return data

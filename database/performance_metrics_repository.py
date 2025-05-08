@@ -4,27 +4,25 @@ class PerformanceMetricsRepository:
     def __init__(self):
         self.db_connection = DatabaseConnection()
 
-    def insert_performance_metrics(self, trade_id, initial_capital, final_capital, total_return, annual_return, max_drawdown, sharpe_ratio, win_rate, avg_profit_pct, risk_reward_ratio, profit_factor):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def __aenter__(self):
+        await self.db_connection.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db_connection.disconnect()
+
+    async def insert_performance_metrics(self, trade_id, initial_capital, final_capital, total_return, annual_return, max_drawdown, sharpe_ratio, win_rate, avg_profit_pct, risk_reward_ratio, profit_factor):
         sql = """
             INSERT INTO performance_metrics (trade_id, initial_capital, final_capital, total_return, annual_return, max_drawdown, sharpe_ratio, win_rate, avg_profit_pct, risk_reward_ratio, profit_factor)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         """
         values = (trade_id, initial_capital, final_capital, total_return, annual_return, max_drawdown, sharpe_ratio, win_rate, avg_profit_pct, risk_reward_ratio, profit_factor)
-        cursor.execute(sql, values)
-        conn.commit()
-        cursor.close()
+        await self.db_connection.execute_query(sql, values)
 
-    def get_performance_metrics_by_trade_id(self, trade_id):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def get_performance_metrics_by_trade_id(self, trade_id):
         sql = """
             SELECT * FROM performance_metrics
-            WHERE trade_id = %s
+            WHERE trade_id = $1
         """
         values = (trade_id,)
-        cursor.execute(sql, values)
-        results = cursor.fetchall()
-        cursor.close()
-        return results
+        return await self.db_connection.execute_query(sql, values)

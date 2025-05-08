@@ -4,27 +4,25 @@ class SignalRepository:
     def __init__(self):
         self.db_connection = DatabaseConnection()
 
-    def insert_signal(self, market_data_id, strategy_id, signal):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def __aenter__(self):
+        await self.db_connection.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db_connection.disconnect()
+
+    async def insert_signal(self, market_data_id, strategy_id, signal):
         sql = """
             INSERT INTO signals (market_data_id, strategy_id, signal)
-            VALUES (%s, %s, %s)
+            VALUES ($1, $2, $3)
         """
         values = (market_data_id, strategy_id, signal)
-        cursor.execute(sql, values)
-        conn.commit()
-        cursor.close()
+        await self.db_connection.execute_query(sql, values)
 
-    def get_signals_by_strategy_id(self, strategy_id):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def get_signals_by_strategy_id(self, strategy_id):
         sql = """
             SELECT * FROM signals
-            WHERE strategy_id = %s
+            WHERE strategy_id = $1
         """
         values = (strategy_id,)
-        cursor.execute(sql, values)
-        results = cursor.fetchall()
-        cursor.close()
-        return results
+        return await self.db_connection.execute_query(sql, values)

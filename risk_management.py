@@ -4,13 +4,16 @@ from binance.client import Client
 from typing import Optional, Dict, Any
 from strategy_factory import Strategy  # Fixed import to use the abstract Strategy class
 from execution_engine import ExecutionEngine 
+from utils import handle_error
+logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__) 
+from risk_management_interface import RiskManagementInterface
 
-class RiskManagement:
+class RiskManagement(RiskManagementInterface):
     """
     Class for managing trading risk based on technical indicators and account constraints.
     """
+    @handle_error
     def __init__(self, client: Client, strategy: Strategy, engine: ExecutionEngine, max_risk: float):
         """
         Initialize the risk management system.
@@ -66,10 +69,10 @@ class RiskManagement:
             # Apply position sizing constraints
             # 1. Round to appropriate decimal places for the asset
             from config import get_config
-            position_size = round(max_position_size, get_config("quantity_precision", 5))
+            position_size = round(max_position_size, get_config("quantity_precision"))
             
             # 2. Ensure minimum order size is met
-            min_order_size = get_config("min_order_size", 0.001)
+            min_order_size = get_config("min_order_size")
             position_size = max(position_size, min_order_size)
             
             # Update the quantity in the execution engine
@@ -86,6 +89,7 @@ class RiskManagement:
             
         except Exception as e:
             logger.error(f"Error during risk management: {e}", exc_info=True)
+            raise RiskError(f"Error during risk management: {e}") from e
             return None
 
 

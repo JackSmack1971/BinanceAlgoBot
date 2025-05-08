@@ -1,13 +1,44 @@
 import json
 from typing import List, Dict, Callable
+from utils import handle_error
+
+from typing import Type, Any
 
 class ConfigurationService:
-    def __init__(self, config_file: str):
+    @handle_error
+    def __init__(self, config_file: str = 'config.json'):
         self.config_file = config_file
-        self.config: Dict = {}
+        self.config: Dict[str, Any] = {}
         self.observers: List[Callable] = []
         self.load_config()
 
+class TypedConfigurationService(ConfigurationService):
+    def __init__(self, config_file: str = 'config.json'):
+        super().__init__(config_file)
+        self.config_types: Dict[str, Type] = {}
+        self.default_values: Dict[str, Any] = {}
+
+    def declare_config(self, key: str, config_type: Type, default_value: Any):
+        self.config_types[key] = config_type
+        self.default_values[key] = default_value
+        if key not in self.config:
+            self.config[key] = default_value
+
+    def get_config(self, key: str, default=None):
+        if key not in self.config_types:
+            raise ValueError(f"Configuration key '{key}' not declared.")
+        
+        value = super().get_config(key, self.default_values[key])
+
+        if not isinstance(value, self.config_types[key]):
+            try:
+                value = self.config_types[key](value)
+            except ValueError:
+                raise ValueError(f"Configuration key '{key}' has invalid type. Expected {self.config_types[key]}, got {type(value)}.")
+        
+        return value
+
+    @handle_error
     def load_config(self):
         try:
             with open(self.config_file, 'r') as f:
@@ -19,19 +50,25 @@ class ConfigurationService:
             print(f"Error: Invalid JSON in configuration file '{self.config_file}'.")
             self.config = {}
 
+    @handle_error
     def get_config(self, key: str, default=None):
         return self.config.get(key, default)
 
+    @handle_error
     def set_config(self, key: str, value):
         self.config[key] = value
         self.notify_observers()
 
+    @handle_error
     def register_observer(self, observer: Callable):
         self.observers.append(observer)
 
+    @handle_error
+    @handle_error
     def unregister_observer(self, observer: Callable):
         self.observers.remove(observer)
 
+    @handle_error
     def notify_observers(self):
         for observer in self.observers:
             observer()

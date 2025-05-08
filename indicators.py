@@ -8,11 +8,13 @@ from config import get_config
 
 logger = logging.getLogger(__name__)
 
+from utils import handle_error
 import time
 
 class TechnicalIndicators:
     """Class for calculating various technical indicators for trading."""
 
+    @handle_error
     def __init__(self, ema_window=None, rsi_window=None, atr_window=None, vwap_window=None):
         """
         Initialize the indicators with configurable window parameters.
@@ -28,17 +30,17 @@ class TechnicalIndicators:
                                         Defaults to config value if None.
         """
         # Use provided parameters or defaults from config
-        self.ema_window = ema_window if ema_window else get_config('ema_window', 14)
-        self.rsi_window = rsi_window if rsi_window else get_config('rsi_window', 14)
-        self.atr_window = atr_window if atr_window else get_config('atr_window', 14)
-        self.vwap_window = vwap_window if vwap_window else get_config('vwap_window', 14)
+        self.ema_window = ema_window if ema_window else get_config('ema_window')
+        self.rsi_window = rsi_window if rsi_window else get_config('rsi_window')
+        self.atr_window = atr_window if atr_window else get_config('atr_window')
+        self.vwap_window = vwap_window if vwap_window else get_config('vwap_window')
 
 
 class CachedIndicators(TechnicalIndicators):
     """
     Class for calculating technical indicators with caching.
     """
-
+    @handle_error
     def __init__(self, cache_expiry=60, *args, **kwargs):
         """
         Initialize the cached indicators with a cache expiry time.
@@ -81,6 +83,7 @@ class CachedIndicators(TechnicalIndicators):
             return data
         except Exception as e:
             logger.error(f"An error occurred while calculating EMA: {e}", exc_info=True)
+            raise DataError(f"An error occurred while calculating EMA: {e}") from e
             return data
     
     def calculate_rsi(self, data):
@@ -103,6 +106,7 @@ class CachedIndicators(TechnicalIndicators):
             return data
         except Exception as e:
             logger.error(f"An error occurred while calculating RSI: {e}", exc_info=True)
+            raise DataError(f"An error occurred while calculating RSI: {e}") from e
             return data
     
     def calculate_atr(self, data):
@@ -127,6 +131,7 @@ class CachedIndicators(TechnicalIndicators):
             return data
         except Exception as e:
             logger.error(f"An error occurred while calculating ATR: {e}", exc_info=True)
+            raise DataError(f"An error occurred while calculating ATR: {e}") from e
             return data
     
     def calculate_vwap(self, data):
@@ -152,8 +157,10 @@ class CachedIndicators(TechnicalIndicators):
             return data
         except Exception as e:
             logger.error(f"An error occurred while calculating VWAP: {e}", exc_info=True)
+            raise DataError(f"An error occurred while calculating VWAP: {e}") from e
             return data
     
+    @handle_error
     def calculate_all(self, data):
         """
         Calculate all indicators at once.
@@ -171,21 +178,28 @@ class CachedIndicators(TechnicalIndicators):
             data = self.calculate_vwap(data)
 
             # Store indicators in the database
-            from database.indicator_repository import IndicatorRepository
-            indicator_repo = IndicatorRepository()
+            from service.service_locator import ServiceLocator
+            service_locator = ServiceLocator()
+            indicator_service = service_locator.get("IndicatorService")
+            market_data_service = service_locator.get("MarketDataService")
+
             for index, row in data.iterrows():
                 # Assuming 'timestamp' column exists in the DataFrame and corresponds to market_data
                 # You might need to adjust the query based on your actual data structure
-                from database.market_data_repository import MarketDataRepository
-                market_data_repo = MarketDataRepository()
-                market_data = market_data_repo.get_market_data(symbol="BTCUSDT", interval="15m", start_time=row['timestamp'], end_time=row['timestamp'])
+                market_data = market_data_service.get_market_data(symbol="BTCUSDT") #, interval="15m", start_time=row['timestamp'], end_time=row['timestamp'])
                 if market_data:
                     market_data_id = market_data[0][0]  # Assuming the first column is the ID
-                    indicator_repo.insert_indicator(
-                        market_data_id=market_data_id,
-                        ema=row.get('ema'),
-                        rsi=row.get('rsi'),
-                        atr=row.get('atr'),
-                        vwap=row.get('vwap')
+                    indicator_service.insert_performance_metrics(
+                        trade_id=market_data_id,
+                        initial_capital=row.get('ema'),
+                        final_capital=row.get('rsi'),
+                        total_return=row.get('atr'),
+                        annual_return=row.get('vwap'),
+                        max_drawdown=0,
+                        sharpe_ratio=0,
+                        win_rate=0,
+                        avg_profit_pct=0,
+                        risk_reward_ratio=0,
+                        profit_factor=0
                     )
         return data

@@ -17,6 +17,7 @@ class BTCStrategy(Strategy):
     Bitcoin trading strategy based on EMA, RSI, ATR, and VWAP indicators.
     """
 
+    @handle_error
     def __init__(self, client: Client, symbol: str, interval: str,
                  ema_window: int = None, rsi_window: int = None,
                  atr_window: int = None, vwap_window: int = None,
@@ -38,10 +39,10 @@ class BTCStrategy(Strategy):
         super().__init__(client, symbol, interval, initial_balance, risk_per_trade)
 
         # Use provided parameters or defaults from config
-        self.ema_window = ema_window if ema_window else get_config('ema_window', 14)
-        self.rsi_window = rsi_window if rsi_window else get_config('rsi_window', 14)
-        self.atr_window = atr_window if atr_window else get_config('atr_window', 14)
-        self.vwap_window = vwap_window if vwap_window else get_config('vwap_window', 14)
+        self.ema_window = ema_window if ema_window else get_config('ema_window')
+        self.rsi_window = rsi_window if rsi_window else get_config('rsi_window')
+        self.atr_window = atr_window if atr_window else get_config('atr_window')
+        self.vwap_window = vwap_window if vwap_window else get_config('vwap_window')
 
         # Initialize indicators
         self.indicators = TechnicalIndicators(
@@ -50,6 +51,7 @@ class BTCStrategy(Strategy):
             atr_window=self.atr_window,
             vwap_window=self.vwap_window
         )
+        self.data_feed = DataFeed(client=client, symbol=symbol, interval=interval)
 
     @handle_error
     def calculate_indicators(self):
@@ -66,6 +68,7 @@ class BTCStrategy(Strategy):
             return data
         except Exception as e:
             logger.error(f"An error occurred while calculating indicators: {e}", exc_info=True)
+            raise DataError(f"An error occurred while calculating indicators: {e}") from e
             return None
 
     @handle_error
@@ -88,11 +91,11 @@ class BTCStrategy(Strategy):
             data['signal'] = 0.0
 
             # Get configuration values
-            rsi_buy = get_config('rsi_buy_threshold', 50)
-            rsi_sell = get_config('rsi_sell_threshold', 50)
-            volatility_increase = get_config('volatility_increase_factor', 1.5)
-            volatility_decrease = get_config('volatility_decrease_factor', 0.7)
-            rsi_oversold = get_config('rsi_oversold', 30)
+            rsi_buy = get_config('rsi_buy_threshold')
+            rsi_sell = get_config('rsi_sell_threshold')
+            volatility_increase = get_config('volatility_increase_factor')
+            volatility_decrease = get_config('volatility_decrease_factor')
+            rsi_oversold = get_config('rsi_oversold')
 
             # Trading rules based on indicators
             for i in range(1, len(data)):
@@ -154,6 +157,7 @@ class BTCStrategy(Strategy):
 
         except Exception as e:
             logger.error(f"Error generating trading signals: {e}", exc_info=True)
+            raise StrategyError(f"Error generating trading signals: {e}") from e
             return None
 
     def open_position(self, side: str, price: float, size: float):
@@ -168,6 +172,7 @@ class EMAcrossStrategy(Strategy):
     Strategy based on EMA crossovers.
     """
 
+    @handle_error
     def __init__(self, client: Client, symbol: str, interval: str,
                  fast_ema_window: int = None, slow_ema_window: int = None,
                  initial_balance: float = 10000, risk_per_trade: float = 0.01):
@@ -191,6 +196,7 @@ class EMAcrossStrategy(Strategy):
 
         # Initialize indicators (we'll still use the TechnicalIndicators class, but override the calculate_indicators method)
         self.indicators = TechnicalIndicators()
+        self.data_feed = DataFeed(client=client, symbol=symbol, interval=interval)
 
     @handle_error
     def calculate_indicators(self):
@@ -219,6 +225,7 @@ class EMAcrossStrategy(Strategy):
             return data
         except Exception as e:
             logger.error(f"An error occurred while calculating indicators: {e}", exc_info=True)
+            raise DataError(f"An error occurred while calculating indicators: {e}") from e
             return None
 
     @handle_error
@@ -294,6 +301,7 @@ class EMAcrossStrategy(Strategy):
 
         except Exception as e:
             logger.error(f"Error generating trading signals: {e}", exc_info=True)
+            raise StrategyError(f"Error generating trading signals: {e}") from e
             return None
 
     def open_position(self, side: str, price: float, size: float):
@@ -308,6 +316,7 @@ class MACDStrategy(Strategy):
     Strategy based on MACD (Moving Average Convergence Divergence).
     """
 
+    @handle_error
     def __init__(self, client: Client, symbol: str, interval: str,
                  fast_window: int = None, slow_window: int = None, signal_window: int = None,
                  initial_balance: float = 10000, risk_per_trade: float = 0.01):
@@ -327,15 +336,15 @@ class MACDStrategy(Strategy):
         super().__init__(client, symbol, interval, initial_balance, risk_per_trade)
 
         # Use provided parameters or defaults
-        self.fast_window = fast_window if fast_window else 12
-        self.slow_window = slow_window if slow_window else 26
-        self.signal_window = signal_window if signal_window else 9
+        self.fast_window = int(fast_window if fast_window else 12)
+        self.slow_window = int(slow_window if slow_window else 26)
+        self.signal_window = int(signal_window if signal_window else 9)
+        self.data_feed = DataFeed(client=client, symbol=symbol, interval=interval)
 
     @handle_error
     def calculate_indicators(self):
         """
         Retrieve data and calculate MACD indicators.
-
         Returns:
             pd.DataFrame: DataFrame with MACD indicators calculated
         """
@@ -363,7 +372,8 @@ class MACDStrategy(Strategy):
 
             return data
         except Exception as e:
-            logger.error(f"An error occurred while calculating indicators: {e}", exc_info=True)
+            logger.error(f"Error generating trading signals: {e}", exc_info=True)
+            raise StrategyError(f"Error generating trading signals: {e}") from e
             return None
 
     @handle_error
@@ -442,6 +452,7 @@ class MACDStrategy(Strategy):
 
         except Exception as e:
             logger.error(f"Error generating trading signals: {e}", exc_info=True)
+            raise StrategyError(f"Error generating trading signals: {e}") from e
             return None
 
     def open_position(self, side: str, price: float, size: float):
@@ -450,7 +461,7 @@ class MACDStrategy(Strategy):
     def close_position(self, price: float):
         self.position_manager.close_position(self.symbol, price)
 
-
+@handle_error
 class StrategyFactory:
     """
     Factory class for creating different trading strategies.
@@ -499,14 +510,17 @@ class StrategyFactory:
         Returns:
             Strategy: Strategy instance or None if the strategy type is not registered
         """
-        if strategy_type not in cls._strategies:
-            logger.error(f"Unknown strategy type: {strategy_type}")
+        strategy_class = cls._strategies.get(strategy_type)
+        if not strategy_class:
+            logger.error(f"Strategy type '{strategy_type}' not registered.")
             return None
 
-        strategy_class = cls._strategies[strategy_type]
-        return strategy_class(client, symbol, interval, initial_balance=initial_balance, risk_per_trade=risk_per_trade, **kwargs)
+        # Pass the client and other parameters to the strategy
+        strategy = strategy_class(client, symbol, interval, initial_balance, risk_per_trade, **kwargs)
+        return strategy
 
-# Register the strategies
+
+# Register strategies (this is where you register your strategy classes)
 StrategyFactory.register_strategy("btc", BTCStrategy)
 StrategyFactory.register_strategy("ema_cross", EMAcrossStrategy)
 StrategyFactory.register_strategy("macd", MACDStrategy)

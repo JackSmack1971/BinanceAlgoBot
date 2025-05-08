@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Any
 import pandas as pd
 
+from utils import handle_error
 logger = logging.getLogger(__name__)
 
 class ReportGenerator:
@@ -9,6 +10,7 @@ class ReportGenerator:
     Generates a detailed report of the backtest results.
     """
 
+    @handle_error
     def generate_report(self, results: Dict[str, Any], strategy_name: str, symbol: str, interval: str, filename: str = None) -> str:
         """
         Generates a detailed report of the backtest results.
@@ -97,4 +99,5 @@ class ReportGenerator:
 
         except Exception as e:
             logger.error(f"Error generating report: {e}", exc_info=True)
+            raise BaseTradingException(f"Error generating report: {e}") from e
             return f"Error generating report: {e}"

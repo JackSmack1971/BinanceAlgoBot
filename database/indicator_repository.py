@@ -4,27 +4,25 @@ class IndicatorRepository:
     def __init__(self):
         self.db_connection = DatabaseConnection()
 
-    def insert_indicator(self, market_data_id, ema, rsi, atr, vwap):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def __aenter__(self):
+        await self.db_connection.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db_connection.disconnect()
+
+    async def insert_indicator(self, market_data_id, ema, rsi, atr, vwap):
         sql = """
             INSERT INTO indicators (market_data_id, ema, rsi, atr, vwap)
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES ($1, $2, $3, $4, $5)
         """
         values = (market_data_id, ema, rsi, atr, vwap)
-        cursor.execute(sql, values)
-        conn.commit()
-        cursor.close()
+        await self.db_connection.execute_query(sql, values)
 
-    def get_indicators_by_market_data_id(self, market_data_id):
-        conn = self.db_connection.get_connection()
-        cursor = conn.cursor()
+    async def get_indicators_by_market_data_id(self, market_data_id):
         sql = """
             SELECT * FROM indicators
-            WHERE market_data_id = %s
+            WHERE market_data_id = $1
         """
         values = (market_data_id,)
-        cursor.execute(sql, values)
-        results = cursor.fetchall()
-        cursor.close()
-        return results
+        return await self.db_connection.execute_query(sql, values)
