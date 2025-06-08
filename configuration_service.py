@@ -2,6 +2,13 @@ import json
 import os
 from typing import List, Dict, Callable, Type, Any
 from utils import handle_error
+from exceptions import ConfigurationError
+
+ENV_VAR_MAPPING = {
+    "api_key": "BINANCE_API_KEY",
+    "secret_key": "BINANCE_SECRET_KEY",
+    "database_url": "DATABASE_URL",
+}
 
 class ConfigurationService:
     @handle_error
@@ -51,7 +58,7 @@ class TypedConfigurationService(ConfigurationService):
 
     @handle_error
     def get_config(self, key: str, default=None):
-        env_key = key.upper()
+        env_key = ENV_VAR_MAPPING.get(key, key.upper())
         env_value = os.getenv(env_key)
         if env_value is not None:
             return env_value
@@ -74,6 +81,18 @@ class TypedConfigurationService(ConfigurationService):
     def notify_observers(self):
         for observer in self.observers:
             observer()
+
+    @handle_error
+    def validate_required(self, keys: List[str]):
+        missing = []
+        for key in keys:
+            value = self.get_config(key)
+            if value is None or str(value).strip() == "":
+                missing.append(key)
+        if missing:
+            raise ConfigurationError(
+                f"Missing required configuration keys: {', '.join(missing)}"
+            )
 
 if __name__ == '__main__':
     # Example usage

@@ -71,6 +71,7 @@ class TradingOrchestrator:
             use_testnet = self.config_service.get_config('use_testnet')
             api_key = self.config_service.get_config('api_key')
             api_secret = self.config_service.get_config('secret_key')
+            self.config_service.validate_required(['api_key', 'secret_key'])
             if use_testnet:
                 self.client = Client(api_key, api_secret, testnet=True)
                 logger.info("Using Binance testnet")
