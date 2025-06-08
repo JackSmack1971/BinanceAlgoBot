@@ -1,205 +1,94 @@
 import logging
+import time
+from typing import Any
+
 import pandas as pd
-from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
+from ta.trend import EMAIndicator
 from ta.volatility import AverageTrueRange
 from ta.volume import VolumeWeightedAveragePrice
+
 from config import get_config
+from utils import handle_error
 
 logger = logging.getLogger(__name__)
 
-from utils import handle_error
-import time
 
 class TechnicalIndicators:
-    """Class for calculating various technical indicators for trading."""
+    """Utility class for calculating various indicators."""
 
     @handle_error
-    def __init__(self, ema_window=None, rsi_window=None, atr_window=None, vwap_window=None):
-        """
-        Initialize the indicators with configurable window parameters.
-        
-        Args:
-            ema_window (int, optional): Window period for EMA calculation. 
-                                       Defaults to config value if None.
-            rsi_window (int, optional): Window period for RSI calculation. 
-                                       Defaults to config value if None.
-            atr_window (int, optional): Window period for ATR calculation. 
-                                       Defaults to config value if None.
-            vwap_window (int, optional): Window period for VWAP calculation. 
-                                        Defaults to config value if None.
-        """
-        # Use provided parameters or defaults from config
-        self.ema_window = ema_window if ema_window else get_config('ema_window')
-        self.rsi_window = rsi_window if rsi_window else get_config('rsi_window')
-        self.atr_window = atr_window if atr_window else get_config('atr_window')
-        self.vwap_window = vwap_window if vwap_window else get_config('vwap_window')
+    def __init__(self, ema_window: int | None = None, rsi_window: int | None = None, atr_window: int | None = None, vwap_window: int | None = None) -> None:
+        self.ema_window = ema_window or get_config("ema_window")
+        self.rsi_window = rsi_window or get_config("rsi_window")
+        self.atr_window = atr_window or get_config("atr_window")
+        self.vwap_window = vwap_window or get_config("vwap_window")
 
 
 class CachedIndicators(TechnicalIndicators):
-    """
-    Class for calculating technical indicators with caching.
-    """
-    @handle_error
-    def __init__(self, cache_expiry=60, *args, **kwargs):
-        """
-        Initialize the cached indicators with a cache expiry time.
+    """Indicator calculations with caching."""
 
-        Args:
-            cache_expiry (int, optional): Time in seconds before the cache expires. Defaults to 60.
-        """
+    @handle_error
+    def __init__(self, cache_expiry: int = 60, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.cache = {}
+        self.cache: dict[str, Any] = {}
         self.cache_expiry = cache_expiry
 
-    def calculate_ema(self, data):
-        """
-        Calculate Exponential Moving Average (EMA) with caching.
-
-        Args:
-            data (pd.DataFrame): DataFrame containing 'close' prices
-
-        Returns:
-            pd.DataFrame: DataFrame with added 'ema' column
-        """
+    def calculate_ema(self, data: pd.DataFrame) -> pd.DataFrame:
         cache_key = f"ema_{self.ema_window}_{len(data)}"
         if cache_key in self.cache:
             cached_value, cache_time = self.cache[cache_key]
             if time.time() - cache_time < self.cache_expiry:
-                logger.info(f"Returning cached EMA for window {self.ema_window}")
-                data['ema'] = cached_value
+                logger.info("Returning cached EMA for window %s", self.ema_window)
+                data["ema"] = cached_value
                 return data
-            else:
-                logger.info(f"Cache expired for EMA with window {self.ema_window}, recalculating...")
-        try:
-            ema_indicator = EMAIndicator(
-                close=data['close'],
-                window=self.ema_window,
-                fillna=True
-            )
-            ema = ema_indicator.ema_indicator()
-            data['ema'] = ema
-            self.cache[cache_key] = (ema, time.time())  # Cache the EMA values and the time
-            return data
-        except Exception as e:
-            logger.error(f"An error occurred while calculating EMA: {e}", exc_info=True)
-            raise DataError(f"An error occurred while calculating EMA: {e}") from e
-            return data
-    
-    def calculate_rsi(self, data):
-        """
-        Calculate Relative Strength Index (RSI).
-        
-        Args:
-            data (pd.DataFrame): DataFrame containing 'close' prices
-            
-        Returns:
-            pd.DataFrame: DataFrame with added 'rsi' column
-        """
-        try:
-            rsi_indicator = RSIIndicator(
-                close=data['close'], 
-                window=self.rsi_window, 
-                fillna=True
-            )
-            data['rsi'] = rsi_indicator.rsi()
-            return data
-        except Exception as e:
-            logger.error(f"An error occurred while calculating RSI: {e}", exc_info=True)
-            raise DataError(f"An error occurred while calculating RSI: {e}") from e
-            return data
-    
-    def calculate_atr(self, data):
-        """
-        Calculate Average True Range (ATR).
-        
-        Args:
-            data (pd.DataFrame): DataFrame containing 'high', 'low', and 'close' prices
-            
-        Returns:
-            pd.DataFrame: DataFrame with added 'atr' column
-        """
-        try:
-            atr_indicator = AverageTrueRange(
-                high=data['high'], 
-                low=data['low'], 
-                close=data['close'], 
-                window=self.atr_window, 
-                fillna=True
-            )
-            data['atr'] = atr_indicator.average_true_range()
-            return data
-        except Exception as e:
-            logger.error(f"An error occurred while calculating ATR: {e}", exc_info=True)
-            raise DataError(f"An error occurred while calculating ATR: {e}") from e
-            return data
-    
-    def calculate_vwap(self, data):
-        """
-        Calculate Volume Weighted Average Price (VWAP).
-        
-        Args:
-            data (pd.DataFrame): DataFrame containing 'high', 'low', 'close', and 'volume' data
-            
-        Returns:
-            pd.DataFrame: DataFrame with added 'vwap' column
-        """
-        try:
-            vwap_indicator = VolumeWeightedAveragePrice(
-                high=data['high'], 
-                low=data['low'], 
-                close=data['close'], 
-                volume=data['volume'], 
-                window=self.vwap_window, 
-                fillna=True
-            )
-            data['vwap'] = vwap_indicator.volume_weighted_average_price()
-            return data
-        except Exception as e:
-            logger.error(f"An error occurred while calculating VWAP: {e}", exc_info=True)
-            raise DataError(f"An error occurred while calculating VWAP: {e}") from e
-            return data
-    
-    @handle_error
-    def calculate_all(self, data):
-        """
-        Calculate all indicators at once.
-        
-        Args:
-            data (pd.DataFrame): DataFrame containing required OHLCV data
-            
-        Returns:
-            pd.DataFrame: DataFrame with all indicators added
-        """
-        if data is not None and not data.empty:
-            data = self.calculate_ema(data)
-            data = self.calculate_rsi(data)
-            data = self.calculate_atr(data)
-            data = self.calculate_vwap(data)
-
-            # Store indicators in the database
-            from service.service_locator import ServiceLocator
-            service_locator = ServiceLocator()
-            indicator_service = service_locator.get("IndicatorService")
-            market_data_service = service_locator.get("MarketDataService")
-
-            for index, row in data.iterrows():
-                # Assuming 'timestamp' column exists in the DataFrame and corresponds to market_data
-                # You might need to adjust the query based on your actual data structure
-                market_data = market_data_service.get_market_data(symbol="BTCUSDT") #, interval="15m", start_time=row['timestamp'], end_time=row['timestamp'])
-                if market_data:
-                    market_data_id = market_data[0][0]  # Assuming the first column is the ID
-                    indicator_service.insert_performance_metrics(
-                        trade_id=market_data_id,
-                        initial_capital=row.get('ema'),
-                        final_capital=row.get('rsi'),
-                        total_return=row.get('atr'),
-                        annual_return=row.get('vwap'),
-                        max_drawdown=0,
-                        sharpe_ratio=0,
-                        win_rate=0,
-                        avg_profit_pct=0,
-                        risk_reward_ratio=0,
-                        profit_factor=0
-                    )
+            logger.info("Cache expired for EMA with window %s, recalculating...", self.ema_window)
+        ema_indicator = EMAIndicator(close=data["close"], window=self.ema_window, fillna=True)
+        ema = ema_indicator.ema_indicator()
+        data["ema"] = ema
+        self.cache[cache_key] = (ema, time.time())
         return data
+
+    def calculate_rsi(self, data: pd.DataFrame) -> pd.DataFrame:
+        rsi_indicator = RSIIndicator(close=data["close"], window=self.rsi_window, fillna=True)
+        data["rsi"] = rsi_indicator.rsi()
+        return data
+
+    def calculate_atr(self, data: pd.DataFrame) -> pd.DataFrame:
+        atr_indicator = AverageTrueRange(high=data["high"], low=data["low"], close=data["close"], window=self.atr_window, fillna=True)
+        data["atr"] = atr_indicator.average_true_range()
+        return data
+
+    def calculate_vwap(self, data: pd.DataFrame) -> pd.DataFrame:
+        vwap_indicator = VolumeWeightedAveragePrice(high=data["high"], low=data["low"], close=data["close"], volume=data["volume"], window=self.vwap_window, fillna=True)
+        data["vwap"] = vwap_indicator.volume_weighted_average_price()
+        return data
+
+    @handle_error
+    async def calculate_all(self, data: pd.DataFrame) -> pd.DataFrame:
+        if data is None or data.empty:
+            return data
+        data = self.calculate_ema(data)
+        data = self.calculate_rsi(data)
+        data = self.calculate_atr(data)
+        data = self.calculate_vwap(data)
+        from service.service_locator import ServiceLocator
+
+        service_locator = ServiceLocator()
+        indicator_service = service_locator.get("IndicatorService")
+        market_data_service = service_locator.get("MarketDataService")
+        for _, row in data.iterrows():
+            market_data = await market_data_service.get_market_data(symbol="BTCUSDT")
+            if market_data:
+                market_data_id = market_data[0][0]
+                await indicator_service.calculate_indicators([
+                    {
+                        "market_data_id": market_data_id,
+                        "ema": row.get("ema", 0),
+                        "rsi": row.get("rsi", 0),
+                        "atr": row.get("atr", 0),
+                        "vwap": row.get("vwap", 0),
+                    }
+                ])
+        return data
+

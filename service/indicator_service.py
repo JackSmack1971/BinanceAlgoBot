@@ -1,62 +1,58 @@
 import abc
-from typing import List, Dict, Any
-from service.repository_service import RepositoryService, transaction
+import logging
+from typing import Any, Dict, List
+
+from utils import handle_error
 from database.indicator_repository import IndicatorRepository
 from database.market_data_repository import MarketDataRepository
-from utils import handle_error
-import logging
-from exceptions import BaseTradingException, DataError, IndicatorServiceException
+from service.repository_service import RepositoryService
+from exceptions import DataError
 
 logger = logging.getLogger(__name__)
 
+
 class IndicatorService(abc.ABC):
     @abc.abstractmethod
-    def calculate_indicators(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        pass
+    async def calculate_indicators(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        ...
 
     @abc.abstractmethod
-    def get_indicators(self, indicator_name: str) -> List[Dict[str, Any]]:
-        pass
+    async def get_indicators(self, market_data_id: int) -> List[Dict[str, Any]]:
+        ...
+
 
 class IndicatorServiceImpl(RepositoryService):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.indicator_repository = IndicatorRepository()
         self.market_data_repository = MarketDataRepository()
 
     @handle_error
-    def calculate_indicators(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        conn = self.get_connection()
+    async def calculate_indicators(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         try:
-            with self.transaction(conn):
+            async with self.transaction():
                 for item in data:
-                    # Assuming indicator calculation logic here
-                    # Example: item['indicator_value'] = calculate_some_indicator(item['close'])
-                    self.indicator_repository.insert_indicator(
-                        timestamp=item['timestamp'],
-                        indicator_name='some_indicator',
-                        indicator_value=item['indicator_value']
+                    await self.indicator_repository.insert_indicator(
+                        market_data_id=item["market_data_id"],
+                        ema=item["ema"],
+                        rsi=item["rsi"],
+                        atr=item["atr"],
+                        vwap=item["vwap"],
                     )
                 logger.debug("Calculated and inserted indicators.")
-                return data
-        except Exception as e:
-            logger.error(f"Error calculating and inserting indicators: {e}", exc_info=True)
-            raise DataError(f"Error calculating and inserting indicators: {e}") from e
-        finally:
-            self.put_connection(conn)
+            return data
+        except Exception as exc:
+            logger.error("Error calculating indicators: %s", exc, exc_info=True)
+            raise DataError(f"Error calculating indicators: {exc}") from exc
 
     @handle_error
-    def get_indicators(self, indicator_name: str) -> List[Dict[str, Any]]:
-        conn = self.get_connection()
+    async def get_indicators(self, market_data_id: int) -> List[Dict[str, Any]]:
         try:
-            indicators = self.indicator_repository.get_indicators_by_name(indicator_name)
-            logger.debug(f"Retrieved indicators by name: {indicator_name}.")
-            return indicators
-        except Exception as e:
-            logger.error(f"Error getting indicators by name {indicator_name}: {e}", exc_info=True)
-            raise DataError(f"Error getting indicators by name {indicator_name}: {e}") from e
-        finally:
-            self.put_connection(conn)
+            return await self.indicator_repository.get_indicators_by_market_data_id(market_data_id)
+        except Exception as exc:
+            logger.error("Error getting indicators for id %s: %s", market_data_id, exc, exc_info=True)
+            raise DataError(f"Error getting indicators for id {market_data_id}: {exc}") from exc
 
-    def close_connection(self, conn):
-        conn.close()
+    async def close_connection(self) -> None:
+        await self.db_connection.disconnect()
+

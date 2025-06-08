@@ -1,28 +1,32 @@
 from database.database_connection import DatabaseConnection
 
+
 class ConfigurationRepository:
-    def __init__(self):
+    def __init__(self) -> None:
         self.db_connection = DatabaseConnection()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "ConfigurationRepository":
         await self.db_connection.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.db_connection.disconnect()
 
-    async def insert_configuration(self, config_name, config_value, version):
+    async def insert_configuration(self, config_name: str, config_value: str, version: str) -> None:
         sql = """
             INSERT INTO configurations (config_name, config_value, version)
             VALUES ($1, $2, $3)
         """
         values = (config_name, config_value, version)
-        await self.db_connection.execute_query(sql, values)
+        async with self.db_connection as conn:
+            await conn.execute_query(sql, values)
 
-    async def get_configuration_by_name(self, config_name):
+    async def get_configuration_by_name(self, config_name: str):
         sql = """
             SELECT * FROM configurations
             WHERE config_name = $1
         """
         values = (config_name,)
-        return await self.db_connection.execute_query(sql, values)
+        async with self.db_connection as conn:
+            return await conn.execute_query(sql, values)
+
