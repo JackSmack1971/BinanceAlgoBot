@@ -1,28 +1,49 @@
 from database.database_connection import DatabaseConnection
 
+
 class RiskParametersRepository:
-    def __init__(self):
+    def __init__(self) -> None:
         self.db_connection = DatabaseConnection()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "RiskParametersRepository":
         await self.db_connection.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.db_connection.disconnect()
 
-    async def insert_risk_parameters(self, strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version):
+    async def insert_risk_parameters(
+        self,
+        strategy_id: int,
+        max_risk_per_trade: float,
+        max_open_trades: int,
+        stop_loss_percentage: float,
+        take_profit_percentage: float,
+        version: str,
+    ) -> None:
         sql = """
-            INSERT INTO risk_parameters (strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO risk_parameters (
+                strategy_id, max_risk_per_trade, max_open_trades,
+                stop_loss_percentage, take_profit_percentage, version
+            ) VALUES ($1, $2, $3, $4, $5, $6)
         """
-        values = (strategy_id, max_risk_per_trade, max_open_trades, stop_loss_percentage, take_profit_percentage, version)
-        await self.db_connection.execute_query(sql, values)
+        values = (
+            strategy_id,
+            max_risk_per_trade,
+            max_open_trades,
+            stop_loss_percentage,
+            take_profit_percentage,
+            version,
+        )
+        async with self.db_connection as conn:
+            await conn.execute_query(sql, values)
 
-    async def get_risk_parameters_by_strategy_id(self, strategy_id):
+    async def get_risk_parameters_by_strategy_id(self, strategy_id: int):
         sql = """
             SELECT * FROM risk_parameters
             WHERE strategy_id = $1
         """
         values = (strategy_id,)
-        return await self.db_connection.execute_query(sql, values)
+        async with self.db_connection as conn:
+            return await conn.execute_query(sql, values)
+

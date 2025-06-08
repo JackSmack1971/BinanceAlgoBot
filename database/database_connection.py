@@ -1,48 +1,60 @@
 import asyncpg
 import logging
+from typing import Any, Iterable, Optional
+
 from config import DATABASE_URL
 from exceptions import DataError
 
 logger = logging.getLogger(__name__)
 
+
 class DatabaseConnection:
-    def __init__(self, min_conn=1, max_conn=10):
-        self.conn_pool = None
+    """Async wrapper around an asyncpg connection pool."""
+
+    def __init__(self, min_conn: int = 1, max_conn: int = 10) -> None:
+        self.conn_pool: Optional[asyncpg.pool.Pool] = None
         self.min_conn = min_conn
         self.max_conn = max_conn
 
-    async def connect(self):
+    async def connect(self) -> None:
+        """Initialize the async connection pool."""
         try:
-            self.conn_pool = await asyncpg.create_pool(DATABASE_URL, min_size=self.min_conn, max_size=self.max_conn)
-            print("Database connection pool established.")
-        except Exception as e:
-            logger.error(f"Error connecting to the database: {e}", exc_info=True)
-            raise DataError(f"Error connecting to the database: {e}") from e
+            self.conn_pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                min_size=self.min_conn,
+                max_size=self.max_conn,
+            )
+            logger.info("Database connection pool established.")
+        except Exception as exc:  # pragma: no cover - initialization failures
+            logger.error("Error connecting to the database: %s", exc, exc_info=True)
+            raise DataError(f"Error connecting to the database: {exc}") from exc
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         if self.conn_pool:
             await self.conn_pool.close()
-            print("Database connection pool closed.")
+            logger.info("Database connection pool closed.")
 
-    async def get_connection(self):
+    async def __aenter__(self) -> "DatabaseConnection":
         if not self.conn_pool:
             await self.connect()
-        return await self.conn_pool.acquire()
+        return self
 
-    async def release_connection(self, conn):
-        if self.conn_pool:
-            await self.conn_pool.release(conn)
+    async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - trivial
+        # Connections are acquired per query, nothing to clean up here
+        pass
 
-    async def execute_query(self, query, params=None):
-        conn = None
-        try:
-            conn = await self.get_connection()
-            result = await conn.fetch(query, *params) if params else await conn.fetch(query)
-            return result
-        except Exception as e:
-            logger.error(f"Error executing query: {e}", exc_info=True)
-            raise DataError(f"Error executing query: {e}") from e
-            raise
-        finally:
-            if conn:
-                await self.release_connection(conn)
+    async def execute_query(
+        self, query: str, params: Optional[Iterable[Any]] = None
+    ) -> Any:
+        """Execute a query using a pooled connection."""
+        if not self.conn_pool:
+            await self.connect()
+        async with self.conn_pool.acquire() as conn:
+            try:
+                if params:
+                    return await conn.fetch(query, *params)
+                return await conn.fetch(query)
+            except Exception as exc:
+                logger.error("Error executing query: %s", exc, exc_info=True)
+                raise DataError(f"Error executing query: {exc}") from exc
+
