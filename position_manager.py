@@ -48,6 +48,5 @@ class PositionManager:
         return self.position
 
     @handle_error
-    @handle_error
     def get_balance(self):
         return self.balance

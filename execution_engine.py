@@ -61,10 +61,11 @@ class ExecutionEngine(ExecutionEngineInterface):
                 elif latest_signal == -1.0:
                     await self._execute_sell()
 
-        except Exception as e:
-            logger.error(f"An error occurred during trade execution: {e}", exc_info=True)
-            raise ExchangeError(f"An error occurred during trade execution: {e}") from e
-            raise TradeExecutionError(f"Could not execute trades for symbol {self.strategy.symbol}") from e
+        except Exception as exc:
+            logger.error("Error during trade execution: %s", exc, exc_info=True)
+            raise TradeExecutionError(
+                f"Could not execute trades for symbol {self.strategy.symbol}: {exc}"
+            ) from exc
 
     async def _execute_buy(self):
         """Execute a buy order."""
@@ -96,10 +97,11 @@ class ExecutionEngine(ExecutionEngineInterface):
                 size=self.quantity
             )
 
-        except Exception as e:
-            logger.error(f"An error occurred during buy execution: {e}", exc_info=True)
-            raise ExchangeError(f"An error occurred during buy execution: {e}") from e
-            raise TradeExecutionError(f"Could not execute buy order for symbol {self.strategy.symbol} and quantity {self.quantity}") from e
+        except Exception as exc:
+            logger.error("Error during buy execution: %s", exc, exc_info=True)
+            raise TradeExecutionError(
+                f"Could not execute buy order for symbol {self.strategy.symbol} and quantity {self.quantity}: {exc}"
+            ) from exc
 
         # Store trade history in the database
         try:
@@ -116,8 +118,8 @@ class ExecutionEngine(ExecutionEngineInterface):
                 duration=0.0,  # Replace with actual duration
                 commission_fee=0.0  # Replace with actual commission fee
             )
-        except Exception as e:
-            logger.error(f"Error storing trade history: {e}", exc_info=True)
+        except Exception as exc:
+            logger.error("Error storing trade history: %s", exc, exc_info=True)
 
     async def _execute_sell(self):
         """Execute a sell order."""
@@ -147,10 +149,11 @@ class ExecutionEngine(ExecutionEngineInterface):
                 price=0.0  # Replace with actual price
             )
 
-        except Exception as e:
-            logger.error(f"An error occurred during sell execution: {e}", exc_info=True)
-            raise ExchangeError(f"An error occurred during sell execution: {e}") from e
-            raise TradeExecutionError(f"Could not execute sell order for symbol {self.strategy.symbol} and quantity {self.quantity}") from e
+        except Exception as exc:
+            logger.error("Error during sell execution: %s", exc, exc_info=True)
+            raise TradeExecutionError(
+                f"Could not execute sell order for symbol {self.strategy.symbol} and quantity {self.quantity}: {exc}"
+            ) from exc
 
         # Store trade history in the database
         try:
@@ -167,5 +170,5 @@ class ExecutionEngine(ExecutionEngineInterface):
                 duration=0.0,  # Replace with actual duration
                 commission_fee=0.0  # Replace with actual commission fee
             )
-        except Exception as e:
-            logger.error(f"Error storing trade history: {e}", exc_info=True)
+        except Exception as exc:
+            logger.error("Error storing trade history: %s", exc, exc_info=True)

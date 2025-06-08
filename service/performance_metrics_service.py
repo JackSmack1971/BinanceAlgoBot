@@ -5,7 +5,7 @@ from typing import Any, Dict
 from utils import handle_error
 from database.performance_metrics_repository import PerformanceMetricsRepository
 from service.repository_service import RepositoryService
-from exceptions import DataError
+from exceptions import DataError, PerformanceMetricsServiceException
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,12 @@ class PerformanceMetricsServiceImpl(RepositoryService):
     async def get_performance_metrics_by_trade_id(self, trade_id: int) -> Dict[str, Any]:
         try:
             return await self.performance_metrics_repository.get_performance_metrics_by_trade_id(trade_id)
+        except DataError as exc:
+            logger.error("Database error in %s: %s", self.__class__.__name__, exc)
+            raise PerformanceMetricsServiceException(f"Operation failed: {exc}") from exc
         except Exception as exc:
-            logger.error("Error getting performance metrics for trade ID %s: %s", trade_id, exc, exc_info=True)
-            raise DataError(f"Error getting performance metrics for trade ID {trade_id}: {exc}") from exc
+            logger.error("Unexpected error getting performance metrics for trade ID %s: %s", trade_id, exc, exc_info=True)
+            raise PerformanceMetricsServiceException(f"Operation failed: {exc}") from exc
 
     @handle_error
     async def insert_performance_metrics(
@@ -77,9 +80,12 @@ class PerformanceMetricsServiceImpl(RepositoryService):
                     profit_factor,
                 )
                 logger.debug("Inserted performance metrics for trade ID %s.", trade_id)
+        except DataError as exc:
+            logger.error("Database error in %s: %s", self.__class__.__name__, exc)
+            raise PerformanceMetricsServiceException(f"Operation failed: {exc}") from exc
         except Exception as exc:
-            logger.error("Error inserting performance metrics for trade ID %s: %s", trade_id, exc, exc_info=True)
-            raise DataError(f"Error inserting performance metrics for trade ID {trade_id}: {exc}") from exc
+            logger.error("Unexpected error inserting performance metrics for trade ID %s: %s", trade_id, exc, exc_info=True)
+            raise PerformanceMetricsServiceException(f"Operation failed: {exc}") from exc
 
     async def close_connection(self) -> None:
         await self.db_connection.disconnect()

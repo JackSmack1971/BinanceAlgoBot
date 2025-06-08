@@ -1,3 +1,4 @@
+import asyncio
 import asyncpg
 import logging
 from typing import Any, Iterable, Optional
@@ -17,17 +18,24 @@ class DatabaseConnection:
         self.max_conn = max_conn
 
     async def connect(self) -> None:
-        """Initialize the async connection pool."""
-        try:
-            self.conn_pool = await asyncpg.create_pool(
-                DATABASE_URL,
-                min_size=self.min_conn,
-                max_size=self.max_conn,
-            )
-            logger.info("Database connection pool established.")
-        except Exception as exc:  # pragma: no cover - initialization failures
-            logger.error("Error connecting to the database: %s", exc, exc_info=True)
-            raise DataError(f"Error connecting to the database: {exc}") from exc
+        """Initialize the async connection pool with simple retry logic."""
+        attempts = 3
+        for attempt in range(1, attempts + 1):
+            try:
+                self.conn_pool = await asyncpg.create_pool(
+                    DATABASE_URL,
+                    min_size=self.min_conn,
+                    max_size=self.max_conn,
+                )
+                logger.info("Database connection pool established.")
+                return
+            except Exception as exc:  # pragma: no cover - initialization failures
+                logger.error(
+                    "Database connection attempt %s failed: %s", attempt, exc, exc_info=True
+                )
+                if attempt == attempts:
+                    raise DataError(f"Error connecting to the database: {exc}") from exc
+                await asyncio.sleep(attempt)
 
     async def disconnect(self) -> None:
         if self.conn_pool:
