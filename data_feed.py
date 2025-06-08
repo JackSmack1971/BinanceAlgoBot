@@ -2,6 +2,7 @@ import logging
 from binance.client import Client
 import pandas as pd
 from config import get_config
+from exceptions import BaseTradingException, DataError
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,9 @@ class DataFeed:
             klines = self.client.get_klines(symbol=self.symbol, interval=self.interval)
         except Exception as e:
             logger.error(f"An error occurred: {e}", exc_info=True)
-            raise DataError(f"An error occurred: {e}") from e
-            raise DataRetrievalError(f"Could not retrieve data for symbol {self.symbol} and interval {self.interval}") from e
+            raise DataRetrievalError(
+                f"Could not retrieve data for symbol {self.symbol} and interval {self.interval}"
+            ) from e
 
         data = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
         data = data.astype(float)

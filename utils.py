@@ -1,18 +1,21 @@
 import logging
 import functools
+from exceptions import BaseTradingException
 
 logger = logging.getLogger(__name__)
 
+
 def handle_error(func):
-    """
-    Decorator to handle exceptions in strategy methods.
-    """
+    """Decorator to log errors and raise a BaseTradingException."""
+    
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            logger.error(f"An error occurred in {func.__name__}: {e}", exc_info=True)
-            raise BaseTradingException(f"An error occurred in {func.__name__}: {e}") from e
-            return None
+            log = logging.getLogger(func.__module__)
+            log.error(f"Error in {func.__name__}: {e}", exc_info=True)
+            raise BaseTradingException(f"Error in {func.__name__}: {e}") from e
+
     return wrapper
+
