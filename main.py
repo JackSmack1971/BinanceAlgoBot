@@ -18,6 +18,7 @@ from trading_orchestrator import TradingOrchestrator
 from backtester import Backtester
 from config import STRATEGY_TYPES
 from configuration_service import ConfigurationService
+from exceptions import BaseTradingException
 
 def configure_logging():
     """Configure logging based on the configuration."""

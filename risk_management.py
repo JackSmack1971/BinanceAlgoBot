@@ -3,8 +3,9 @@ import logging
 from binance.client import Client
 from typing import Optional, Dict, Any
 from strategy_factory import Strategy  # Fixed import to use the abstract Strategy class
-from execution_engine import ExecutionEngine 
+from execution_engine import ExecutionEngine
 from utils import handle_error
+from exceptions import RiskError
 logger = logging.getLogger(__name__)
 
 from risk_management_interface import RiskManagementInterface

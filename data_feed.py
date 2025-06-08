@@ -2,13 +2,9 @@ import logging
 from binance.client import Client
 import pandas as pd
 from config import get_config
-from exceptions import BaseTradingException, DataError
+from exceptions import BaseTradingException, DataError, DataRetrievalError
 
 logger = logging.getLogger(__name__)
-
-class DataRetrievalError(BaseTradingException):
-    """Exception raised when there is an error retrieving data."""
-    pass
 
 from utils import handle_error
 

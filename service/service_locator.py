@@ -1,3 +1,5 @@
+from exceptions import ConfigurationError
+
 class ServiceLocator:
     _instance = None
 

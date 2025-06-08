@@ -8,7 +8,27 @@ parameters without changing code in multiple files.
 
 from configuration_service import TypedConfigurationService
 
+# Binance related constants used across the project
+BINANCE_CONSTANTS = {
+    "KLINE_INTERVAL_1MINUTE": "1m",
+    "KLINE_INTERVAL_3MINUTE": "3m",
+    "KLINE_INTERVAL_5MINUTE": "5m",
+    "KLINE_INTERVAL_15MINUTE": "15m",
+    "KLINE_INTERVAL_30MINUTE": "30m",
+    "KLINE_INTERVAL_1HOUR": "1h",
+}
+
+# Supported strategy types with short descriptions
+STRATEGY_TYPES = {
+    "btc": "BTC strategy",
+    "ema_cross": "EMA crossover strategy",
+    "macd": "MACD strategy",
+}
+
 config_service = TypedConfigurationService('config.json')
+
+# Convenience constant for database URL
+DATABASE_URL = config_service.get_config('database_url')
 
 config_service.declare_config('database_url', str, "postgresql://user:password@host:port/database")
 config_service.declare_config('use_testnet', bool, True)

@@ -1,4 +1,5 @@
 from utils import handle_error
+from exceptions import OrderError
 
 class PositionManager:
     @handle_error

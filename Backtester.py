@@ -6,6 +6,7 @@ from datetime import datetime
 from binance.client import Client
 
 from utils import handle_error
+from exceptions import BaseTradingException
 
 from strategy_factory import Strategy
 from config import get_config
