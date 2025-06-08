@@ -4,6 +4,7 @@ import psycopg2
 import psycopg2.pool
 from contextlib import contextmanager
 import logging
+from exceptions import DataError
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,8 @@
 import pandas as pd
 from abc import ABC, abstractmethod
 from typing import Protocol
+import logging
+from exceptions import DataError
 
 class DataSourceStrategy(Protocol):
     """
@@ -25,6 +27,8 @@ class DataSourceStrategy(Protocol):
 
 
 from utils import handle_error
+
+logger = logging.getLogger(__name__)
 
 class BinanceDataSourceStrategy:
     """

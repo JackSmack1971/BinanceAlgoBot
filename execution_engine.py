@@ -4,12 +4,10 @@ from typing import Optional
 import pandas as pd
 from strategy_factory import Strategy  # Fixed import to use the abstract Strategy class
 from exchange_interface import ExchangeInterface
+from position_manager import PositionManager
+from exceptions import BaseTradingException, ExchangeError, TradeExecutionError
 
 logger = logging.getLogger(__name__)
-
-class TradeExecutionError(BaseTradingException):
-    """Exception raised when there is an error executing a trade."""
-    pass
 
 from utils import handle_error
 from execution_engine_interface import ExecutionEngineInterface

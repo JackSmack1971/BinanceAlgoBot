@@ -3,6 +3,7 @@ from typing import Dict, Any
 import pandas as pd
 
 from utils import handle_error
+from exceptions import BaseTradingException
 logger = logging.getLogger(__name__)
 
 class ReportGenerator:

@@ -5,11 +5,9 @@ from database.indicator_repository import IndicatorRepository
 from database.market_data_repository import MarketDataRepository
 from utils import handle_error
 import logging
+from exceptions import BaseTradingException, DataError, IndicatorServiceException
 
 logger = logging.getLogger(__name__)
-
-class IndicatorServiceException(BaseTradingException):
-    pass
 
 class IndicatorService(abc.ABC):
     @abc.abstractmethod

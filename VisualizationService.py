@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.dates as mdates
 import pandas as pd
+from exceptions import BaseTradingException
 
 logger = logging.getLogger(__name__)
 

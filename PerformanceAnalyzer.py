@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 from typing import Dict, Any
 from utils import handle_error
+from exceptions import BaseTradingException
 
 logger = logging.getLogger(__name__)
 

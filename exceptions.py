@@ -25,3 +25,23 @@ class RiskError(BaseTradingException):
 class OrderError(BaseTradingException):
     """Exception raised for order related errors."""
     pass
+
+class DataRetrievalError(BaseTradingException):
+    """Exception raised when there is an error retrieving data."""
+    pass
+
+class TradeExecutionError(BaseTradingException):
+    """Exception raised when trade execution fails."""
+    pass
+
+class IndicatorServiceException(BaseTradingException):
+    """Exception raised from indicator services."""
+    pass
+
+class MarketDataServiceException(BaseTradingException):
+    """Exception raised from market data services."""
+    pass
+
+class PerformanceMetricsServiceException(BaseTradingException):
+    """Exception raised from performance metrics services."""
+    pass

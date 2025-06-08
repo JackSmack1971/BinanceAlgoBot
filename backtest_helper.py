@@ -3,6 +3,7 @@ import pandas as pd
 from strategy_factory import Strategy
 from typing import Dict, Any
 from backtest_configuration import BacktestConfiguration
+from exceptions import DataError, StrategyError
 
 logger = logging.getLogger(__name__)
 

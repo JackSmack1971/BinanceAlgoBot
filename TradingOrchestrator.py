@@ -12,6 +12,7 @@ from execution_engine import ExecutionEngine
 from risk_management import RiskManagement
 from strategy_factory import StrategyFactory, Strategy
 from signal_manager import SignalManager
+from exceptions import BaseTradingException, StrategyError, ExchangeError
 
 logger = logging.getLogger(__name__)
 

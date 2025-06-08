@@ -1,5 +1,9 @@
 import asyncpg
+import logging
 from config import DATABASE_URL
+from exceptions import DataError
+
+logger = logging.getLogger(__name__)
 
 class DatabaseConnection:
     def __init__(self, min_conn=1, max_conn=10):

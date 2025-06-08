@@ -4,11 +4,9 @@ from service.repository_service import RepositoryService, transaction
 from database.performance_metrics_repository import PerformanceMetricsRepository
 from utils import handle_error
 import logging
+from exceptions import BaseTradingException, DataError, PerformanceMetricsServiceException
 
 logger = logging.getLogger(__name__)
-
-class PerformanceMetricsServiceException(BaseTradingException):
-    pass
 
 class PerformanceMetricsService(abc.ABC):
     @abc.abstractmethod

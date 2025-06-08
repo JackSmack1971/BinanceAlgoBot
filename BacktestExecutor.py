@@ -6,6 +6,7 @@ from backtest_helper import BacktestHelper
 from strategy_factory import Strategy
 from binance.client import Client
 from datetime import datetime
+from exceptions import BaseTradingException
 
 logger = logging.getLogger(__name__)
 
