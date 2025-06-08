@@ -40,13 +40,13 @@ class DataFeed:
             DataRetrievalError: If there is an error retrieving data from Binance
         """
         try:
-            logger.info(f"Retrieving data for {self.symbol} on {self.interval} timeframe")
+            logger.info("Retrieving data for %s on %s timeframe", self.symbol, self.interval)
             klines = self.client.get_klines(symbol=self.symbol, interval=self.interval)
-        except Exception as e:
-            logger.error(f"An error occurred: {e}", exc_info=True)
+        except Exception as exc:
+            logger.warning("Data retrieval failed: %s", exc)
             raise DataRetrievalError(
                 f"Could not retrieve data for symbol {self.symbol} and interval {self.interval}"
-            ) from e
+            ) from exc
 
         data = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
         data = data.astype(float)
@@ -57,9 +57,9 @@ class DataFeed:
         # Store data in the database
         from database.market_data_repository import MarketDataRepository
         market_data_repo = MarketDataRepository()
-        
+
         market_data_list = []
-        for index, row in data.iterrows():
+        for _, row in data.iterrows():
             market_data = {
                 'symbol': self.symbol,
                 'interval': self.interval,
@@ -77,7 +77,11 @@ class DataFeed:
                 'ignored': row['ignored']
             }
             market_data_list.append(market_data)
-        
-        market_data_repo.insert_market_data(market_data_list)
+
+        try:
+            market_data_repo.insert_market_data(market_data_list)
+        except DataError as exc:
+            logger.error("Database error storing market data: %s", exc)
+            raise
         
         return data
