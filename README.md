@@ -41,11 +41,13 @@ These dependencies are listed in the `requirements.txt` file.
 
 ## Configuration
 
-Set your Binance API credentials using environment variables before running the bot:
+Create a `.env` file based on `.env.example` and set your Binance API credentials before running the bot:
 
 ```bash
-export API_KEY="your_api_key"
-export SECRET_KEY="your_secret_key"
+cp .env.example .env
+export BINANCE_API_KEY="your_api_key"
+export BINANCE_SECRET_KEY="your_secret_key"
+export DATABASE_URL="postgresql://user:password@host:5432/db"
 ```
 
 The provided `config.json` keeps these values empty to avoid accidentally committing secrets.

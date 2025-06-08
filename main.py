@@ -276,6 +276,7 @@ async def async_main():
     # Initialize the Binance client
     api_key = config_service.get_config('api_key')
     api_secret = config_service.get_config('secret_key')
+    config_service.validate_required(['api_key', 'secret_key'])
     use_testnet = config_service.get_config('use_testnet', True)
     if use_testnet:
         client = Client(api_key, api_secret, testnet=True)
