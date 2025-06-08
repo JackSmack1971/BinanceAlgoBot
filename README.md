@@ -38,3 +38,14 @@ The project relies on the following external Python libraries:
 *   **backtester**: Used for backtesting trading strategies.
 
 These dependencies are listed in the `requirements.txt` file.
+
+## Configuration
+
+Set your Binance API credentials using environment variables before running the bot:
+
+```bash
+export API_KEY="your_api_key"
+export SECRET_KEY="your_secret_key"
+```
+
+The provided `config.json` keeps these values empty to avoid accidentally committing secrets.

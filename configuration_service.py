@@ -1,8 +1,7 @@
 import json
-from typing import List, Dict, Callable
+import os
+from typing import List, Dict, Callable, Type, Any
 from utils import handle_error
-
-from typing import Type, Any
 
 class ConfigurationService:
     @handle_error
@@ -52,6 +51,10 @@ class TypedConfigurationService(ConfigurationService):
 
     @handle_error
     def get_config(self, key: str, default=None):
+        env_key = key.upper()
+        env_value = os.getenv(env_key)
+        if env_value is not None:
+            return env_value
         return self.config.get(key, default)
 
     @handle_error
@@ -63,7 +66,6 @@ class TypedConfigurationService(ConfigurationService):
     def register_observer(self, observer: Callable):
         self.observers.append(observer)
 
-    @handle_error
     @handle_error
     def unregister_observer(self, observer: Callable):
         self.observers.remove(observer)
