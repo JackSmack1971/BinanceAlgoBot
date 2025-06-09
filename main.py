@@ -11,8 +11,11 @@ service_locator.register("MarketDataService", MarketDataServiceImpl())
 # main.py
 import logging.config
 import argparse
+import os
+import asyncio
 from datetime import datetime
 from binance.client import Client
+from security import SecureCredentialManager, CredentialError
 from strategy_factory import StrategyFactory
 from trading_orchestrator import TradingOrchestrator
 from backtester import Backtester
@@ -273,17 +276,15 @@ async def async_main():
     # Initialize the configuration service
     config_service = ConfigurationService()
     
-    # Initialize the Binance client
-    api_key = config_service.get_config('api_key')
-    api_secret = config_service.get_config('secret_key')
-    config_service.validate_required(['api_key', 'secret_key'])
+    enc_key = os.getenv("CREDENTIAL_ENCRYPTION_KEY", "")
+    if not enc_key:
+        raise CredentialError("Missing encryption key")
+    manager = SecureCredentialManager(enc_key)
     use_testnet = config_service.get_config('use_testnet', True)
-    if use_testnet:
-        client = Client(api_key, api_secret, testnet=True)
-        logger.info("Using Binance testnet")
-    else:
-        client = Client(api_key, api_secret)
-        logger.info("Using Binance production API")
+    env = 'testnet' if use_testnet else 'production'
+    creds = asyncio.run(manager.get_credentials('BINANCE', env))
+    client = Client(creds.api_key, creds.api_secret, testnet=use_testnet)
+    logger.info("Using Binance %s", env)
     
     # Display available strategies
     print("\nAvailable Strategies:")

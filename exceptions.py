@@ -45,3 +45,8 @@ class MarketDataServiceException(BaseTradingException):
 class PerformanceMetricsServiceException(BaseTradingException):
     """Exception raised from performance metrics services."""
     pass
+
+
+class CredentialError(BaseTradingException):
+    """Exception raised for credential handling failures."""
+    pass
