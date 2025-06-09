@@ -9,11 +9,15 @@ logger = logging.getLogger(__name__)
 
 
 class RepositoryService(abc.ABC):
+    """Base class for services requiring database access."""
+
     def __init__(self) -> None:
+        """Create a new repository service with its own DB connection."""
         self.db_connection = DatabaseConnection()
 
     @asynccontextmanager
     async def transaction(self):
+        """Async context manager returning a DB transaction."""
         if not self.db_connection.conn_pool:
             await self.db_connection.connect()
         async with self.db_connection.conn_pool.acquire() as conn:
@@ -30,5 +34,6 @@ class RepositoryService(abc.ABC):
 
     @abc.abstractmethod
     async def close_connection(self) -> None:
+        """Close the underlying database connection pool."""
         ...
 

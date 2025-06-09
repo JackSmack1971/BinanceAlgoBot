@@ -37,6 +37,7 @@ class DataFeed:
         )
 
     async def _fetch_klines(self) -> list:
+        """Fetch kline data from Binance with basic error handling."""
         try:
             logger.info(
                 "Retrieving data for %s on %s timeframe", self.symbol, self.interval
@@ -51,6 +52,7 @@ class DataFeed:
             ) from exc
 
     def _prepare_dataframe(self, klines: list) -> pd.DataFrame:
+        """Convert raw kline data to a cleaned ``pandas`` DataFrame."""
         data = pd.DataFrame(
             klines,
             columns=[
@@ -64,6 +66,7 @@ class DataFeed:
         return data.head(self.max_rows)
 
     async def _store_data(self, data: pd.DataFrame) -> None:
+        """Persist fetched market data to the database."""
         from database.market_data_repository import MarketDataRepository
 
         market_data_repo = MarketDataRepository()
@@ -94,6 +97,7 @@ class DataFeed:
 
     @cache_result(ttl=300)
     async def get_data(self) -> pd.DataFrame:
+        """Return cached market data as a DataFrame."""
         klines = await self._fetch_klines()
         data = self._prepare_dataframe(klines)
         logger.debug("Retrieved %s data points", len(data))

@@ -43,6 +43,7 @@ class PerformanceAnalyzer:
 
     @handle_error
     def _calculate_trades(self, results: pd.DataFrame) -> pd.DataFrame:
+        """Return a DataFrame with individual trade statistics."""
         trades = []
         in_position = False
         entry_price = 0.0
@@ -93,6 +94,7 @@ class PerformanceAnalyzer:
 
     @handle_error
     async def _calculate_metrics(self, results: pd.DataFrame, trades: pd.DataFrame, initial_capital: float) -> Dict[str, Any]:
+        """Compute various performance metrics from trade results."""
         metrics: Dict[str, Any] = {}
         metrics["initial_capital"] = initial_capital
         metrics["final_capital"] = results["portfolio_value"].iloc[-1]
@@ -146,6 +148,7 @@ class PerformanceAnalyzer:
         return metrics
 
     async def _store_metrics(self, metrics: Dict[str, Any]) -> None:
+        """Persist calculated metrics using the service layer."""
         from service.service_locator import ServiceLocator
 
         service_locator = ServiceLocator()

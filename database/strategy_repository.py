@@ -3,14 +3,19 @@ from validation import validate_symbol, validate_timeframe, validate_quantity, v
 
 
 class StrategyRepository:
+    """CRUD operations for strategy records."""
+
     def __init__(self) -> None:
+        """Instantiate with a ``DatabaseConnection``."""
         self.db_connection = DatabaseConnection()
 
     async def __aenter__(self) -> "StrategyRepository":
+        """Enter async context by connecting to the database."""
         await self.db_connection.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Disconnect on context exit."""
         await self.db_connection.disconnect()
 
     async def insert_strategy(
@@ -22,6 +27,7 @@ class StrategyRepository:
         initial_balance: float,
         risk_per_trade: float,
     ) -> None:
+        """Insert a new strategy configuration into the database."""
         strategy_name = sanitize_input(strategy_name)
         strategy_type = sanitize_input(strategy_type)
         symbol = validate_symbol(symbol)
@@ -48,6 +54,7 @@ class StrategyRepository:
     async def get_strategy_by_name(
         self, strategy_name: str, page_number: int = 1, page_size: int = 100
     ):
+        """Retrieve strategies filtered by name with pagination."""
         strategy_name = sanitize_input(strategy_name)
         offset = (page_number - 1) * page_size
         sql = """
