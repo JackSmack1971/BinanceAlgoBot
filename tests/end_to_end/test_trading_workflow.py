@@ -1,63 +1,64 @@
+import pandas as pd
 import pytest
+from unittest.mock import Mock
 
-pytest.skip("End-to-end workflow requires full environment", allow_module_level=True)
-
-from TradingOrchestrator import TradingOrchestrator
+from execution_engine import ExecutionEngine
 from exchange_interface import ExchangeInterface
+from strategies.base_strategy import BaseStrategy
 from position_manager import PositionManager
-from data_feed import DataFeed
-from strategy_factory import StrategyFactory
-from strategies.btc_strategy import BTCStrategy
 
 
-class MockExchangeInterface(ExchangeInterface):
+class DummyExchange(ExchangeInterface):
+    async def place_order(self, *_, **__):
+        return True
+
     def fetch_market_data(self, symbol):
         return []
-
-    def place_order(self, symbol, side, quantity, order_type, price=None):
-        return True
 
     def get_account_balance(self):
         return {}
 
     def get_order_status(self, order_id):
         return "filled"
-    def get_current_price(self, symbol):
+
+    def get_current_price(self, symbol):  # pragma: no cover - unused in test
         return 100.0
 
-    def execute_order(self, symbol, order_type, quantity):
-        return True
+
+class SimpleStrategy(BaseStrategy):
+    def __init__(self):
+        super().__init__(Mock(), "BTCUSDT", "15m", 1000, 0.1)
+
+    def calculate_indicators(self):
+        return None
+
+    def run(self):
+        return pd.DataFrame({"signal": [0, 1], "position": [0, 1]})
+
+    def open_position(self, side: str, price: float, size: float):
+        self.position_manager.open_position(self.symbol, side, price, size)
+
+    def close_position(self, price: float):
+        self.position_manager.close_position(self.symbol, price)
 
 
-class MockDataFeed:
-    def get_historical_data(self, symbol, start_date, end_date):
-        return [(100.0, 1000)]
+@pytest.mark.asyncio
+async def test_execute_trades_e2e(monkeypatch):
+    strategy = SimpleStrategy()
+    engine = ExecutionEngine(DummyExchange(), strategy, 1, strategy.position_manager)
 
+    calls = {"buy": 0}
 
-class MockPositionManager(PositionManager):
-    def update_position(self, symbol, quantity, price):
-        pass
+    async def fake_buy(self):
+        calls["buy"] += 1
 
+    async def fake_sell(self):
+        calls["sell"] = 1
 
+    monkeypatch.setattr(engine, "_execute_buy", fake_buy.__get__(engine))
+    monkeypatch.setattr(engine, "_execute_sell", fake_sell.__get__(engine))
 
-class MockExecutionEngine:
-    def execute_trade(self, symbol, order_type, quantity):
-        return True
+    signals = pd.DataFrame({"signal": [0, 1], "position": [0, 1]})
+    await engine.execute_trades(signals)
 
-
-@pytest.fixture
-def trading_workflow():
-    exchange = MockExchangeInterface()
-    position_manager = MockPositionManager(1000, 0.01)
-    execution_engine = MockExecutionEngine()
-    data_feed = MockDataFeed()
-    strategy_factory = StrategyFactory()
-    trading_orchestrator = TradingOrchestrator(exchange, position_manager, execution_engine)
-    strategy_factory.register_strategy("btc", BTCStrategy)
-    return trading_orchestrator, strategy_factory
-
-
-def test_trading_workflow_e2e(trading_workflow):
-    orchestrator, strategy_factory = trading_workflow
-    assert orchestrator is not None
-    assert strategy_factory is not None
+    assert calls["buy"] == 1

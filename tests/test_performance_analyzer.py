@@ -1,13 +1,17 @@
 import pytest
 from PerformanceAnalyzer import PerformanceAnalyzer
-from unittest.mock import MagicMock
 
-def test_performance_analyzer_creation():
-    analyzer = PerformanceAnalyzer()
-    assert analyzer is not None
 
-def test_performance_analyzer_calculate_metrics():
+@pytest.mark.asyncio
+async def test_calculate_performance(monkeypatch, sample_performance_data):
     analyzer = PerformanceAnalyzer()
-    signals = MagicMock()
-    metrics = analyzer.calculate_performance(signals)
-    assert metrics is not None
+
+    async def dummy_store(metrics):
+        dummy_store.saved = metrics
+
+    monkeypatch.setattr(analyzer, "_store_metrics", dummy_store)
+    results = await analyzer.calculate_performance(sample_performance_data)
+
+    assert "metrics" in results
+    assert results["metrics"]["final_capital"] >= analyzer.initial_capital
+    assert hasattr(dummy_store, "saved")

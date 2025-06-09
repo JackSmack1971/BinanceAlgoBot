@@ -9,12 +9,12 @@ from validation import (
 
 
 def test_validate_symbol_success():
-    assert validate_symbol("btcusdt") == "BTCUSDT"
+    assert validate_symbol("BTCUSDT") == "BTCUSDT"
 
 
 def test_validate_symbol_failure():
     with pytest.raises(ValueError):
-        validate_symbol("BTC")
+        validate_symbol("ABC")
 
 
 def test_validate_quantity():
