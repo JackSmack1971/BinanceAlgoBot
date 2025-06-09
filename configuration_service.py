@@ -12,21 +12,28 @@ ENV_VAR_MAPPING = {
 }
 
 class ConfigurationService:
+    """Load configuration values from JSON and environment variables."""
+
     @handle_error
     def __init__(self, config_file: str = 'config.json'):
+        """Initialize and load configuration from ``config_file``."""
         self.config_file = config_file
         self.config: Dict[str, Any] = {}
         self.observers: List[Callable] = []
         self.load_config()
 
 class TypedConfigurationService(ConfigurationService):
+    """Configuration service with type validation."""
+
     def __init__(self, config_file: str = 'config.json'):
+        """Initialize the typed service and validate loaded values."""
         super().__init__(config_file)
         self.config_types: Dict[str, Type] = {}
         self.default_values: Dict[str, Any] = {}
         self.validate_config()
 
     def declare_config(self, key: str, config_type: Type, default_value: Any):
+        """Declare a configuration key and its expected type."""
         self.config_types[key] = config_type
         self.default_values[key] = default_value
         if key not in self.config:
@@ -48,6 +55,7 @@ class TypedConfigurationService(ConfigurationService):
 
     @handle_error
     def load_config(self):
+        """Load configuration values from the JSON file."""
         try:
             with open(self.config_file, 'r') as f:
                 self.config = json.load(f)
@@ -60,6 +68,7 @@ class TypedConfigurationService(ConfigurationService):
 
     @handle_error
     def get_config(self, key: str, default=None):
+        """Return the configuration value for ``key``."""
         env_key = ENV_VAR_MAPPING.get(key, key.upper())
         env_value = os.getenv(env_key)
         if env_value is not None:
@@ -68,24 +77,29 @@ class TypedConfigurationService(ConfigurationService):
 
     @handle_error
     def set_config(self, key: str, value):
+        """Set a configuration value and notify observers."""
         self.config[key] = value
         self.notify_observers()
 
     @handle_error
     def register_observer(self, observer: Callable):
+        """Register a callback for configuration changes."""
         self.observers.append(observer)
 
     @handle_error
     def unregister_observer(self, observer: Callable):
+        """Unregister a previously registered observer."""
         self.observers.remove(observer)
 
     @handle_error
     def notify_observers(self):
+        """Invoke all registered observer callbacks."""
         for observer in self.observers:
             observer()
 
     @handle_error
     def validate_required(self, keys: List[str]):
+        """Ensure that all ``keys`` have non-empty values."""
         missing = []
         for key in keys:
             value = self.get_config(key)
@@ -98,6 +112,7 @@ class TypedConfigurationService(ConfigurationService):
 
     @handle_error
     def validate_config(self) -> None:
+        """Validate configuration values against declared types."""
         for key, expected in self.config_types.items():
             value = self.get_config(key, self.default_values.get(key))
             if expected is float and 'risk' in key:

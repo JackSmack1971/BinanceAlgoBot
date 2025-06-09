@@ -3,14 +3,26 @@ from exceptions import OrderError
 from validation import validate_symbol, validate_quantity, validate_risk
 
 class PositionManager:
+    """Manage open positions and account balance."""
+
     @handle_error
-    def __init__(self, initial_balance, risk_per_trade):
+    def __init__(self, initial_balance: float, risk_per_trade: float) -> None:
+        """Create a new ``PositionManager``.
+
+        Parameters
+        ----------
+        initial_balance : float
+            Starting account balance.
+        risk_per_trade : float
+            Fraction of balance to risk per trade.
+        """
         self.balance = validate_quantity(initial_balance)
         self.risk_per_trade = validate_risk(risk_per_trade)
         self.position = None
 
     @handle_error
-    def open_position(self, symbol, side, price, size):
+    def open_position(self, symbol: str, side: str, price: float, size: float) -> None:
+        """Open a new position if none exists."""
         symbol = validate_symbol(symbol)
         price = validate_quantity(price)
         size = validate_quantity(size)
@@ -26,7 +38,8 @@ class PositionManager:
         print(f"Opened {side} position for {symbol} at {price} with size {size}")
 
     @handle_error
-    def close_position(self, symbol, price):
+    def close_position(self, symbol: str, price: float) -> float:
+        """Close the current position and return the profit."""
         symbol = validate_symbol(symbol)
         price = validate_quantity(price)
         if not self.position:
@@ -51,8 +64,10 @@ class PositionManager:
 
     @handle_error
     def get_position(self):
+        """Return the currently open position or ``None``."""
         return self.position
 
     @handle_error
     def get_balance(self):
+        """Return the current account balance."""
         return self.balance

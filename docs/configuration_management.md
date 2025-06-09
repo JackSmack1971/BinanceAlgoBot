@@ -16,3 +16,12 @@ The project uses a combination of `config.json`, `config.py`, and `configuration
 1.  The `configuration_service.py` loads the configuration from `config.json` when the service is initialized.
 2.  The `config.py` provides the `get_config()` function to access configuration parameters. This function first checks if the parameter is defined as an environment variable. If not, it retrieves the parameter from the loaded `config.json`.
 3.  Components can then use the `get_config()` function to access the configuration parameters they need.
+
+### Example
+
+```python
+from configuration_service import ConfigurationService
+
+config = ConfigurationService()
+api_key = config.get_config("api_key")
+```

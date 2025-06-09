@@ -19,10 +19,12 @@ This directory contains the architectural documentation for the project.
 *   [ExchangeInterface](exchange_interface.md): Documents the `ExchangeInterface`.
 *   [PositionManager](position_manager_interface.md): Documents the `PositionManager`.
 *   [RiskManagement](risk_management_interface.md): Documents the `RiskManagement`.
+*   [Service Interfaces](service_interfaces.md): Describes the service layer APIs.
 
 ## Data Flow Documentation
 
 *   [Data Flow](data_flow.md): Describes the data flow during a backtest.
+*   [Trading Strategies](trading_strategies.md): Explains the implemented strategies and logic.
 
 ## Database Schema Documentation
 

@@ -52,3 +52,4 @@
 | `max_drawdown`    | `DECIMAL(20, 8)`| Maximum drawdown during the backtest      |
 | `sharpe_ratio`    | `DECIMAL(20, 8)`| Sharpe ratio of the backtest              |
 | `created_at`    | `TIMESTAMP` | Timestamp of when the result was created |
+
