@@ -1,4 +1,5 @@
 from database.database_connection import DatabaseConnection
+from validation import validate_risk, validate_quantity, sanitize_input
 
 
 class RiskParametersRepository:
@@ -21,6 +22,12 @@ class RiskParametersRepository:
         take_profit_percentage: float,
         version: str,
     ) -> None:
+        strategy_id = int(validate_quantity(strategy_id))
+        max_risk_per_trade = validate_risk(max_risk_per_trade)
+        max_open_trades = int(validate_quantity(max_open_trades))
+        stop_loss_percentage = validate_risk(stop_loss_percentage)
+        take_profit_percentage = validate_risk(take_profit_percentage)
+        version = sanitize_input(version)
         sql = """
             INSERT INTO risk_parameters (
                 strategy_id, max_risk_per_trade, max_open_trades,
@@ -39,6 +46,7 @@ class RiskParametersRepository:
             await conn.execute_query(sql, values)
 
     async def get_risk_parameters_by_strategy_id(self, strategy_id: int):
+        strategy_id = int(validate_quantity(strategy_id))
         sql = """
             SELECT * FROM risk_parameters
             WHERE strategy_id = $1

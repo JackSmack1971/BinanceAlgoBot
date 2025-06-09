@@ -13,6 +13,8 @@ from risk_management import RiskManagement
 from strategy_factory import StrategyFactory, Strategy
 from signal_manager import SignalManager
 from exceptions import BaseTradingException, StrategyError, ExchangeError
+from position_manager import PositionManager
+from validation import validate_symbol, validate_timeframe, validate_risk, validate_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +36,18 @@ class TradingOrchestrator:
             intervals (List[str], optional): List of timeframe intervals. Defaults to config value if None.
         """
         self.config_service = config_service
-        
+        risk_per_trade = validate_risk(risk_per_trade)
+        initial_balance = validate_quantity(initial_balance)
+
         # Use default symbol if none provided
         if symbols is None:
             symbols = [self.config_service.get_config('default_symbol')]
-        self.symbols = symbols
-        
+        self.symbols = [validate_symbol(s) for s in symbols]
+
         # Use default interval if none provided
         if intervals is None:
             intervals = [self.config_service.get_config('default_interval')]
-        self.intervals = intervals
+        self.intervals = [validate_timeframe(i) for i in intervals]
         
         # Initialize the client
         self.client = None
@@ -83,8 +87,8 @@ class TradingOrchestrator:
             default_strategy_type = self.config_service.get_config("default_strategy_type")
 
             # Get initial balance and risk per trade from config
-            initial_balance = float(self.config_service.get_config("initial_balance"))
-            risk_per_trade = float(self.config_service.get_config("risk_per_trade"))
+            initial_balance = validate_quantity(float(self.config_service.get_config("initial_balance")))
+            risk_per_trade = validate_risk(float(self.config_service.get_config("risk_per_trade")))
         
             # Initialize components for each symbol-interval pair
             for symbol in self.symbols:
@@ -207,6 +211,8 @@ class TradingOrchestrator:
             logger.error("Client not initialized. Call initialize() first.")
             return False
         
+        symbol = validate_symbol(symbol)
+        interval = validate_timeframe(interval)
         key = f"{symbol}_{interval}"
         if key in self.components:
             logger.warning(f"{key} already exists in the components")
@@ -268,6 +274,8 @@ class TradingOrchestrator:
             logger.error("Client not initialized. Call initialize() first.")
             return False
         
+        symbol = validate_symbol(symbol)
+        interval = validate_timeframe(interval)
         key = f"{symbol}_{interval}"
         if key not in self.components:
             logger.warning(f"{key} not found in the components")

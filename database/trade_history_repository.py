@@ -1,4 +1,5 @@
 from database.database_connection import DatabaseConnection
+from validation import validate_quantity, validate_risk, sanitize_input
 
 
 class TradeHistoryRepository:
@@ -24,6 +25,15 @@ class TradeHistoryRepository:
         duration: float,
         commission_fee: float,
     ) -> None:
+        strategy_id = int(validate_quantity(strategy_id))
+        entry_time = sanitize_input(entry_time)
+        exit_time = sanitize_input(exit_time)
+        position_type = sanitize_input(position_type)
+        entry_price = validate_quantity(entry_price)
+        exit_price = validate_quantity(exit_price)
+        profit_pct = validate_risk(profit_pct)
+        duration = validate_quantity(duration)
+        commission_fee = validate_quantity(commission_fee)
         sql = """
             INSERT INTO trade_history (
                 strategy_id, entry_time, exit_time, position_type,
@@ -47,6 +57,7 @@ class TradeHistoryRepository:
             await conn.execute_query(sql, values)
 
     async def get_trade_history_by_strategy_id(self, strategy_id: int):
+        strategy_id = int(validate_quantity(strategy_id))
         sql = """
             SELECT * FROM trade_history
             WHERE strategy_id = $1
