@@ -1,9 +1,11 @@
 # TradingOrchestrator.py
 import logging
 import asyncio
+import os
 import time
 from typing import Dict, List, Optional
 from binance.client import Client
+from security import SecureCredentialManager, TradingCredentials, CredentialError
 from configuration_service import ConfigurationService
 from BinanceExchangeInterface import BinanceExchangeInterface
 
@@ -53,9 +55,13 @@ class TradingOrchestrator:
         if intervals is None:
             intervals = [self.config_service.get_config('default_interval')]
         self.intervals = [validate_timeframe(i) for i in intervals]
-        
+
         # Initialize the client
         self.client = None
+        encryption_key = os.getenv("CREDENTIAL_ENCRYPTION_KEY", "")
+        if not encryption_key:
+            raise CredentialError("Missing encryption key")
+        self.credential_manager = SecureCredentialManager(encryption_key)
 
         # Initialize PositionManager
         self.position_manager = PositionManager(initial_balance=initial_balance, risk_per_trade=risk_per_trade)
@@ -72,25 +78,31 @@ class TradingOrchestrator:
 
         # Initialize SignalManager
         self.signal_manager = SignalManager()
-        
+
         logger.info(f"Initialized TradingOrchestrator with symbols={self.symbols}, intervals={self.intervals}")
+
+    def _initialize_client(self) -> Client:
+        """Setup Binance client using secure credentials."""
+        use_testnet = self.config_service.get_config('use_testnet')
+        env = 'testnet' if use_testnet else 'production'
+        try:
+            creds = asyncio.run(self.credential_manager.get_credentials('BINANCE', env))
+        except CredentialError as exc:
+            logger.error("Credential error: %s", exc)
+            raise
+        perms = self.credential_manager.validate_permissions(creds)
+        if not perms.get('trade'):
+            raise CredentialError('Insufficient API permissions')
+        client = Client(creds.api_key, creds.api_secret, testnet=use_testnet)
+        logger.info("Using Binance %s API", env)
+        return client
     
     def initialize(self):
         """
         Initialize the Binance client and all trading components.
         """
         try:
-            # Initialize Binance client
-            use_testnet = self.config_service.get_config('use_testnet')
-            api_key = self.config_service.get_config('api_key')
-            api_secret = self.config_service.get_config('secret_key')
-            self.config_service.validate_required(['api_key', 'secret_key'])
-            if use_testnet:
-                self.client = Client(api_key, api_secret, testnet=True)
-                logger.info("Using Binance testnet")
-            else:
-                self.client = Client(api_key, api_secret)
-                logger.info("Using Binance production API")
+            self.client = self._initialize_client()
         
             # Get the default strategy type from config
             default_strategy_type = self.config_service.get_config("default_strategy_type")
