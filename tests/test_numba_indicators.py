@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import pytest
+import fakeredis
+
+from src.cache.redis_cache_manager import _default_cache
 
 from src.indicators.numba_indicators import (
     NumbaIndicatorEngine,
@@ -10,6 +13,13 @@ from src.indicators.numba_indicators import (
     calculate_atr,
     calculate_macd,
 )
+
+
+@pytest.fixture(autouse=True)
+def fake_cache(monkeypatch):
+    fake = fakeredis.aioredis.FakeRedis()
+    monkeypatch.setattr(_default_cache, "client", fake)
+    yield
 
 
 @pytest.fixture

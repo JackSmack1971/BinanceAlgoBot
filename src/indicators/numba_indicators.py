@@ -11,6 +11,8 @@ from typing import Tuple
 from numpy.typing import NDArray
 from typing import cast
 
+from ..cache import cache_function
+
 import numpy as np
 from numba import jit, prange  # type: ignore
 
@@ -111,24 +113,41 @@ def calculate_macd(data: NDArray[np.float64], fast: int = 12, slow: int = 26, si
 class NumbaIndicatorEngine:
     """Async wrapper for Numba-accelerated indicators."""
 
+    @cache_function("sma")
     async def sma(self, data: NDArray[np.float64], window: int) -> NDArray[np.float64]:
         _validate_1d(data, "data")
         return cast(NDArray[np.float64], calculate_sma(data, window))
 
+    @cache_function("ema")
     async def ema(self, data: NDArray[np.float64], window: int) -> NDArray[np.float64]:
         _validate_1d(data, "data")
         return cast(NDArray[np.float64], calculate_ema(data, window))
 
+    @cache_function("rsi")
     async def rsi(self, data: NDArray[np.float64], window: int) -> NDArray[np.float64]:
         _validate_1d(data, "data")
         return cast(NDArray[np.float64], calculate_rsi(data, window))
 
-    async def atr(self, high: NDArray[np.float64], low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
+    @cache_function("atr")
+    async def atr(
+        self,
+        high: NDArray[np.float64],
+        low: NDArray[np.float64],
+        close: NDArray[np.float64],
+        window: int,
+    ) -> NDArray[np.float64]:
         _validate_1d(high, "high")
         _validate_1d(low, "low")
         _validate_1d(close, "close")
         return cast(NDArray[np.float64], calculate_atr(high, low, close, window))
 
-    async def macd(self, data: NDArray[np.float64], fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+    @cache_function("macd")
+    async def macd(
+        self,
+        data: NDArray[np.float64],
+        fast: int = 12,
+        slow: int = 26,
+        signal: int = 9,
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         _validate_1d(data, "data")
         return cast(Tuple[NDArray[np.float64], NDArray[np.float64]], calculate_macd(data, fast, slow, signal))
