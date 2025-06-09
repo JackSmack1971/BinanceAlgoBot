@@ -2,7 +2,7 @@
 import logging
 from binance.client import Client
 from typing import Optional, Dict, Any
-from strategy_factory import Strategy  # Fixed import to use the abstract Strategy class
+from strategies.base_strategy import BaseStrategy
 from execution_engine import ExecutionEngine
 from utils import handle_error
 from exceptions import RiskError
@@ -15,13 +15,13 @@ class RiskManagement(RiskManagementInterface):
     Class for managing trading risk based on technical indicators and account constraints.
     """
     @handle_error
-    def __init__(self, client: Client, strategy: Strategy, engine: ExecutionEngine, max_risk: float):
+    def __init__(self, client: Client, strategy: BaseStrategy, engine: ExecutionEngine, max_risk: float):
         """
         Initialize the risk management system.
         
         Args:
             client (Client): Binance API client
-            strategy (Strategy): Trading strategy
+            strategy (BaseStrategy): Trading strategy
             engine (ExecutionEngine): Execution engine for trades
             max_risk (float): Maximum risk per trade as a decimal (e.g., 0.01 for 1%)
         """

@@ -2,7 +2,7 @@
 import logging
 from typing import Optional
 import pandas as pd
-from strategy_factory import Strategy  # Fixed import to use the abstract Strategy class
+from strategies.base_strategy import BaseStrategy
 from exchange_interface import ExchangeInterface
 from position_manager import PositionManager
 from exceptions import BaseTradingException, ExchangeError, TradeExecutionError
@@ -14,13 +14,13 @@ from execution_engine_interface import ExecutionEngineInterface
 
 class ExecutionEngine(ExecutionEngineInterface):
     @handle_error
-    def __init__(self, exchange_interface: ExchangeInterface, strategy: Strategy, quantity: float, position_manager: PositionManager):
+    def __init__(self, exchange_interface: ExchangeInterface, strategy: BaseStrategy, quantity: float, position_manager: PositionManager):
         """
         Initialize the execution engine.
 
         Args:
             exchange_interface (ExchangeInterface): Exchange interface
-            strategy (Strategy): Trading strategy to execute
+            strategy (BaseStrategy): Trading strategy to execute
             quantity (float): Trade quantity
             position_manager (PositionManager): Position manager
         """

@@ -3,7 +3,7 @@ import pandas as pd
 from typing import Dict, Any
 from backtest_configuration import BacktestConfiguration
 from backtest_helper import BacktestHelper
-from strategy_factory import Strategy
+from strategies.base_strategy import BaseStrategy
 from binance.client import Client
 from datetime import datetime
 from exceptions import BaseTradingException

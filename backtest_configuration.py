@@ -1,5 +1,5 @@
 from binance.client import Client
-from strategy_factory import Strategy
+from strategies.base_strategy import BaseStrategy
 from data_source_strategy import DataSourceStrategy
 
 class BacktestConfiguration:
@@ -7,13 +7,13 @@ class BacktestConfiguration:
     Configuration class for backtesting.
     """
 
-    def __init__(self, client: Client, strategy: Strategy, start_date: str, end_date: str, data_source: DataSourceStrategy, initial_capital: float = 10000.0, commission: float = 0.001):
+    def __init__(self, client: Client, strategy: BaseStrategy, start_date: str, end_date: str, data_source: DataSourceStrategy, initial_capital: float = 10000.0, commission: float = 0.001):
         """
         Initializes the BacktestConfiguration.
 
         Args:
             client (Client): Binance API client.
-            strategy (Strategy): Trading strategy to backtest.
+            strategy (BaseStrategy): Trading strategy to backtest.
             start_date (str): Start date for backtesting (format: 'YYYY-MM-DD').
             end_date (str): End date for backtesting (format: 'YYYY-MM-DD').
             data_source (DataSourceStrategy): Data source strategy.
