@@ -38,13 +38,28 @@ class MarketDataFeed:
         logger.info("Initialized MarketDataFeed %s %s", self.symbol, self.interval)
 
     async def _fetch_klines(self) -> list[Any]:
-        try:
-            return await asyncio.to_thread(
-                self.client.get_klines, symbol=self.symbol, interval=self.interval
-            )
-        except Exception as exc:
-            logger.warning("Data retrieval failed: %s", exc)
-            raise DataRetrievalError("Failed to fetch klines") from exc
+        """Fetch kline data with retry and timeout logic."""
+        attempts = int(os.getenv("API_RETRY_ATTEMPTS", "3"))
+        delay = float(os.getenv("API_RETRY_DELAY", "1"))
+        timeout = int(os.getenv("API_TIMEOUT", "10"))
+
+        for attempt in range(1, attempts + 1):
+            try:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.get_klines,
+                        symbol=self.symbol,
+                        interval=self.interval,
+                    ),
+                    timeout=timeout,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Attempt %s failed to fetch klines: %s", attempt, exc
+                )
+                if attempt == attempts:
+                    raise DataRetrievalError("Failed to fetch klines") from exc
+                await asyncio.sleep(delay)
 
     def _prepare_dataframe(self, klines: list[Any]) -> pd.DataFrame:
         data = pd.DataFrame(
