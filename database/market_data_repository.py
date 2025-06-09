@@ -1,4 +1,5 @@
 from typing import Iterable, Dict, Any
+from validation import validate_symbol, validate_timeframe, validate_quantity
 
 from database.database_connection import DatabaseConnection
 
@@ -27,20 +28,20 @@ class MarketDataRepository:
         """
         values = [
             (
-                data["symbol"],
-                data["interval"],
+                validate_symbol(data["symbol"]),
+                validate_timeframe(data["interval"]),
                 data["timestamp"],
-                data["open"],
-                data["high"],
-                data["low"],
-                data["close"],
-                data["volume"],
+                validate_quantity(data["open"]),
+                validate_quantity(data["high"]),
+                validate_quantity(data["low"]),
+                validate_quantity(data["close"]),
+                validate_quantity(data["volume"]),
                 data["close_time"],
-                data["quote_asset_volume"],
-                data["trades"],
-                data["taker_buy_base"],
-                data["taker_buy_quote"],
-                data["ignored"],
+                validate_quantity(data["quote_asset_volume"]),
+                int(validate_quantity(data["trades"])),
+                validate_quantity(data["taker_buy_base"]),
+                validate_quantity(data["taker_buy_quote"]),
+                validate_quantity(data["ignored"]),
             )
             for data in market_data_list
         ]
@@ -56,6 +57,8 @@ class MarketDataRepository:
         page_number: int = 1,
         page_size: int = 100,
     ):
+        symbol = validate_symbol(symbol)
+        interval = validate_timeframe(interval)
         offset = (page_number - 1) * page_size
         sql = """
             SELECT * FROM market_data

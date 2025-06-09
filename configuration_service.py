@@ -3,6 +3,7 @@ import os
 from typing import List, Dict, Callable, Type, Any
 from utils import handle_error
 from exceptions import ConfigurationError
+from validation import validate_risk
 
 ENV_VAR_MAPPING = {
     "api_key": "BINANCE_API_KEY",
@@ -23,6 +24,7 @@ class TypedConfigurationService(ConfigurationService):
         super().__init__(config_file)
         self.config_types: Dict[str, Type] = {}
         self.default_values: Dict[str, Any] = {}
+        self.validate_config()
 
     def declare_config(self, key: str, config_type: Type, default_value: Any):
         self.config_types[key] = config_type
@@ -93,6 +95,20 @@ class TypedConfigurationService(ConfigurationService):
             raise ConfigurationError(
                 f"Missing required configuration keys: {', '.join(missing)}"
             )
+
+    @handle_error
+    def validate_config(self) -> None:
+        for key, expected in self.config_types.items():
+            value = self.get_config(key, self.default_values.get(key))
+            if expected is float and 'risk' in key:
+                validate_risk(float(value))
+            elif not isinstance(value, expected):
+                try:
+                    expected(value)
+                except Exception:
+                    raise ConfigurationError(
+                        f"Invalid type for {key}: expected {expected.__name__}"
+                    )
 
 if __name__ == '__main__':
     # Example usage

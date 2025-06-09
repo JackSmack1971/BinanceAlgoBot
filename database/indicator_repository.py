@@ -1,4 +1,5 @@
 from database.database_connection import DatabaseConnection
+from validation import validate_quantity
 
 
 class IndicatorRepository:
@@ -20,6 +21,11 @@ class IndicatorRepository:
         atr: float,
         vwap: float,
     ) -> None:
+        market_data_id = int(validate_quantity(market_data_id))
+        ema = validate_quantity(ema)
+        rsi = validate_quantity(rsi)
+        atr = validate_quantity(atr)
+        vwap = validate_quantity(vwap)
         sql = """
             INSERT INTO indicators (market_data_id, ema, rsi, atr, vwap)
             VALUES ($1, $2, $3, $4, $5)
@@ -29,6 +35,7 @@ class IndicatorRepository:
             await conn.execute_query(sql, values)
 
     async def get_indicators_by_market_data_id(self, market_data_id: int):
+        market_data_id = int(validate_quantity(market_data_id))
         sql = """
             SELECT * FROM indicators
             WHERE market_data_id = $1

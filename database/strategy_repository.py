@@ -1,4 +1,5 @@
 from database.database_connection import DatabaseConnection
+from validation import validate_symbol, validate_timeframe, validate_quantity, validate_risk, sanitize_input
 
 
 class StrategyRepository:
@@ -21,6 +22,12 @@ class StrategyRepository:
         initial_balance: float,
         risk_per_trade: float,
     ) -> None:
+        strategy_name = sanitize_input(strategy_name)
+        strategy_type = sanitize_input(strategy_type)
+        symbol = validate_symbol(symbol)
+        interval = validate_timeframe(interval)
+        initial_balance = validate_quantity(initial_balance)
+        risk_per_trade = validate_risk(risk_per_trade)
         sql = """
             INSERT INTO strategies (
                 strategy_name, strategy_type, symbol, interval,
@@ -39,6 +46,7 @@ class StrategyRepository:
             await conn.execute_query(sql, values)
 
     async def get_strategy_by_name(self, strategy_name: str):
+        strategy_name = sanitize_input(strategy_name)
         sql = """
             SELECT * FROM strategies
             WHERE strategy_name = $1

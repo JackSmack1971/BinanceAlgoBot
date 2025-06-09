@@ -1,4 +1,5 @@
 from database.database_connection import DatabaseConnection
+from validation import sanitize_input
 
 
 class ConfigurationRepository:
@@ -13,6 +14,9 @@ class ConfigurationRepository:
         await self.db_connection.disconnect()
 
     async def insert_configuration(self, config_name: str, config_value: str, version: str) -> None:
+        config_name = sanitize_input(config_name)
+        config_value = sanitize_input(config_value)
+        version = sanitize_input(version)
         sql = """
             INSERT INTO configurations (config_name, config_value, version)
             VALUES ($1, $2, $3)
@@ -22,6 +26,7 @@ class ConfigurationRepository:
             await conn.execute_query(sql, values)
 
     async def get_configuration_by_name(self, config_name: str):
+        config_name = sanitize_input(config_name)
         sql = """
             SELECT * FROM configurations
             WHERE config_name = $1

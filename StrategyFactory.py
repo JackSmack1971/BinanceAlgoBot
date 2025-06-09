@@ -9,6 +9,7 @@ from indicators import TechnicalIndicators
 from config import get_config
 from utils import handle_error
 from exceptions import DataError, StrategyError
+from validation import validate_symbol, validate_timeframe, validate_quantity, validate_risk
 
 logger = logging.getLogger(__name__)
 
@@ -516,6 +517,10 @@ class StrategyFactory:
             logger.error(f"Strategy type '{strategy_type}' not registered.")
             return None
 
+        symbol = validate_symbol(symbol)
+        interval = validate_timeframe(interval)
+        initial_balance = validate_quantity(initial_balance)
+        risk_per_trade = validate_risk(risk_per_trade)
         # Pass the client and other parameters to the strategy
         strategy = strategy_class(client, symbol, interval, initial_balance, risk_per_trade, **kwargs)
         return strategy

@@ -1,15 +1,19 @@
 from utils import handle_error
 from exceptions import OrderError
+from validation import validate_symbol, validate_quantity, validate_risk
 
 class PositionManager:
     @handle_error
     def __init__(self, initial_balance, risk_per_trade):
-        self.balance = initial_balance
-        self.risk_per_trade = risk_per_trade
+        self.balance = validate_quantity(initial_balance)
+        self.risk_per_trade = validate_risk(risk_per_trade)
         self.position = None
 
     @handle_error
     def open_position(self, symbol, side, price, size):
+        symbol = validate_symbol(symbol)
+        price = validate_quantity(price)
+        size = validate_quantity(size)
         if self.position:
             raise OrderError("Position already open")
         self.position = {
@@ -23,6 +27,8 @@ class PositionManager:
 
     @handle_error
     def close_position(self, symbol, price):
+        symbol = validate_symbol(symbol)
+        price = validate_quantity(price)
         if not self.position:
             raise OrderError("No position open")
         if self.position["symbol"] != symbol:
