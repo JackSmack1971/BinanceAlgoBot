@@ -14,6 +14,12 @@ from config import get_config
 from performance_utils import log_memory_usage
 from utils import handle_error
 from exceptions import DataRetrievalError, DataError
+from src.risk import (
+    AdvancedCircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerError,
+    RateLimitError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +33,7 @@ class MarketDataFeed:
         symbol: str | None = None,
         interval: str | None = None,
         cache: IntelligentRedisCache | None = None,
+        breaker: AdvancedCircuitBreaker | None = None,
     ) -> None:
         from config import BINANCE_CONSTANTS
 
@@ -35,28 +42,31 @@ class MarketDataFeed:
         self.interval = interval or BINANCE_CONSTANTS["KLINE_INTERVAL_15MINUTE"]
         self.max_rows = int(os.getenv("DATAFRAME_MAX_ROWS", "1000"))
         self.cache = cache or IntelligentRedisCache()
+        self.breaker = breaker or AdvancedCircuitBreaker(
+            "market_data_feed",
+            CircuitBreakerConfig(max_requests_per_minute=120, request_timeout=5.0),
+        )
         logger.info("Initialized MarketDataFeed %s %s", self.symbol, self.interval)
 
     async def _fetch_klines(self) -> list[Any]:
-        """Fetch kline data with retry and timeout logic."""
+        """Fetch kline data with retry, timeout, and circuit breaker."""
         attempts = int(os.getenv("API_RETRY_ATTEMPTS", "3"))
         delay = float(os.getenv("API_RETRY_DELAY", "1"))
-        timeout = int(os.getenv("API_TIMEOUT", "10"))
+
+        async def _call() -> list[Any]:
+            return await asyncio.to_thread(
+                self.client.get_klines,
+                symbol=self.symbol,
+                interval=self.interval,
+            )
 
         for attempt in range(1, attempts + 1):
             try:
-                return await asyncio.wait_for(
-                    asyncio.to_thread(
-                        self.client.get_klines,
-                        symbol=self.symbol,
-                        interval=self.interval,
-                    ),
-                    timeout=timeout,
-                )
+                return await self.breaker.call(_call)
+            except (RateLimitError, CircuitBreakerError) as exc:
+                raise DataRetrievalError("API unavailable") from exc
             except Exception as exc:
-                logger.warning(
-                    "Attempt %s failed to fetch klines: %s", attempt, exc
-                )
+                logger.warning("Attempt %s failed to fetch klines: %s", attempt, exc)
                 if attempt == attempts:
                     raise DataRetrievalError("Failed to fetch klines") from exc
                 await asyncio.sleep(delay)

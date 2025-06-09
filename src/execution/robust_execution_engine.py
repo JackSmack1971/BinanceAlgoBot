@@ -12,6 +12,13 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from src.risk import (
+    AdvancedCircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerError,
+    RateLimitError,
+)
+
 __all__ = [
     "OrderStatus",
     "OrderType",
@@ -128,7 +135,9 @@ class TradingOrder:
         self.total_commission += fill.commission
         total_value = sum(f.price * f.quantity for f in self.fills)
         self.avg_fill_price = (
-            total_value / self.filled_quantity if self.filled_quantity > 0 else Decimal("0")
+            total_value / self.filled_quantity
+            if self.filled_quantity > 0
+            else Decimal("0")
         )
         if self.remaining_quantity <= 0:
             self.status = OrderStatus.FILLED
@@ -157,11 +166,16 @@ class RobustExecutionEngine:
         position_manager: Any,
         risk_manager: Any,
         database_manager: Any,
+        breaker: AdvancedCircuitBreaker | None = None,
     ) -> None:
         self.exchange = exchange_interface
         self.position_manager = position_manager
         self.risk_manager = risk_manager
         self.db = database_manager
+        self.breaker = breaker or AdvancedCircuitBreaker(
+            "execution_engine",
+            CircuitBreakerConfig(max_requests_per_minute=30, request_timeout=10.0),
+        )
         self._active_orders: Dict[str, TradingOrder] = {}
         self._order_lock = asyncio.Lock()
         self._reconciliation_interval = timedelta(minutes=5)
@@ -196,20 +210,26 @@ class RobustExecutionEngine:
             async with self._order_lock:
                 self._active_orders.pop(order.id, None)
 
-    async def _submit_order_with_retry(self, order: TradingOrder, max_retries: int = 3) -> None:
+    async def _submit_order_with_retry(
+        self, order: TradingOrder, max_retries: int = 3
+    ) -> None:
         for attempt in range(max_retries + 1):
             try:
                 order.submitted_at = datetime.utcnow()
                 order.status = OrderStatus.SUBMITTED
-                response = await self.exchange.place_order(
-                    symbol=order.symbol,
-                    side=order.side,
-                    type=order.order_type.value,
-                    quantity=str(order.quantity),
-                    price=str(order.price) if order.price else None,
-                    stopPrice=str(order.stop_price) if order.stop_price else None,
-                    newClientOrderId=order.client_order_id,
-                )
+
+                async def _call() -> Dict[str, Any]:
+                    return await self.exchange.place_order(
+                        symbol=order.symbol,
+                        side=order.side,
+                        type=order.order_type.value,
+                        quantity=str(order.quantity),
+                        price=str(order.price) if order.price else None,
+                        stopPrice=str(order.stop_price) if order.stop_price else None,
+                        newClientOrderId=order.client_order_id,
+                    )
+
+                response = await self.breaker.call(_call)
                 order.exchange_order_id = response.get("orderId")
                 if not order.exchange_order_id:
                     raise ExecutionError("No order ID returned")
@@ -221,8 +241,10 @@ class RobustExecutionEngine:
                 order.last_error = str(exc)
                 order.retry_count = attempt
                 if attempt < max_retries:
-                    delay = 2 ** attempt
-                    self.logger.warning("Submit failed, retrying in %ss: %s", delay, exc)
+                    delay = 2**attempt
+                    self.logger.warning(
+                        "Submit failed, retrying in %ss: %s", delay, exc
+                    )
                     await asyncio.sleep(delay)
                 else:
                     order.status = OrderStatus.FAILED
@@ -234,9 +256,13 @@ class RobustExecutionEngine:
         timeout = timedelta(seconds=order.execution_timeout_seconds)
         while order.is_active and datetime.utcnow() - start < timeout:
             try:
-                exchange_order = await self.exchange.get_order(
-                    symbol=order.symbol, orderId=order.exchange_order_id
-                )
+
+                async def _call() -> Dict[str, Any]:
+                    return await self.exchange.get_order(
+                        symbol=order.symbol, orderId=order.exchange_order_id
+                    )
+
+                exchange_order = await self.breaker.call(_call)
                 await self._update_order_from_exchange(order, exchange_order)
                 if not order.is_active:
                     break
@@ -247,7 +273,9 @@ class RobustExecutionEngine:
         if order.is_active:
             await self._handle_order_timeout(order)
 
-    async def _update_order_from_exchange(self, order: TradingOrder, data: Dict[str, Any]) -> None:
+    async def _update_order_from_exchange(
+        self, order: TradingOrder, data: Dict[str, Any]
+    ) -> None:
         status_map = {
             "NEW": OrderStatus.SUBMITTED,
             "PARTIALLY_FILLED": OrderStatus.PARTIALLY_FILLED,
@@ -304,14 +332,22 @@ class RobustExecutionEngine:
         self.execution_metrics.record_execution(order)
         await self._generate_execution_report(order)
 
-    async def _handle_execution_error(self, order: TradingOrder, error: Exception) -> None:
+    async def _handle_execution_error(
+        self, order: TradingOrder, error: Exception
+    ) -> None:
         order.status = OrderStatus.FAILED
         order.last_error = str(error)
         order.error_count += 1
         await self._save_order(order)
         if order.exchange_order_id:
             try:
-                await self.exchange.cancel_order(symbol=order.symbol, orderId=order.exchange_order_id)
+
+                async def _call() -> Any:
+                    return await self.exchange.cancel_order(
+                        symbol=order.symbol, orderId=order.exchange_order_id
+                    )
+
+                await self.breaker.call(_call)
                 self.logger.info("Cancelled order %s", order.id)
             except Exception as cancel_error:
                 self.logger.error("Cancel failed for %s: %s", order.id, cancel_error)
@@ -333,9 +369,13 @@ class RobustExecutionEngine:
         for order in orders:
             if order.exchange_order_id:
                 try:
-                    data = await self.exchange.get_order(
-                        symbol=order.symbol, orderId=order.exchange_order_id
-                    )
+
+                    async def _call() -> Dict[str, Any]:
+                        return await self.exchange.get_order(
+                            symbol=order.symbol, orderId=order.exchange_order_id
+                        )
+
+                    data = await self.breaker.call(_call)
                     await self._update_order_from_exchange(order, data)
                 except Exception as exc:
                     self.logger.error("Failed to reconcile %s: %s", order.id, exc)
@@ -347,9 +387,13 @@ class RobustExecutionEngine:
             return False
         try:
             if order.exchange_order_id:
-                await self.exchange.cancel_order(
-                    symbol=order.symbol, orderId=order.exchange_order_id
-                )
+
+                async def _call() -> Any:
+                    return await self.exchange.cancel_order(
+                        symbol=order.symbol, orderId=order.exchange_order_id
+                    )
+
+                await self.breaker.call(_call)
             order.status = OrderStatus.CANCELLED
             order.updated_at = datetime.utcnow()
             await self._save_order(order)
@@ -358,17 +402,25 @@ class RobustExecutionEngine:
             self.logger.error("Failed to cancel %s: %s", order_id, exc)
             return False
 
-    async def _handle_order_timeout(self, order: TradingOrder) -> None:  # pragma: no cover
+    async def _handle_order_timeout(
+        self, order: TradingOrder
+    ) -> None:  # pragma: no cover
         order.status = OrderStatus.EXPIRED
         await self._save_order(order)
 
-    async def _send_critical_error_alert(self, order: TradingOrder, error: Exception) -> None:  # pragma: no cover
+    async def _send_critical_error_alert(
+        self, order: TradingOrder, error: Exception
+    ) -> None:  # pragma: no cover
         self.logger.error("Critical error on %s: %s", order.id, error)
 
-    async def _record_slippage_event(self, order: TradingOrder, slippage: Decimal) -> None:  # pragma: no cover
+    async def _record_slippage_event(
+        self, order: TradingOrder, slippage: Decimal
+    ) -> None:  # pragma: no cover
         self.logger.info("Recorded slippage %.2f%% for %s", float(slippage), order.id)
 
-    async def _generate_execution_report(self, order: TradingOrder) -> None:  # pragma: no cover
+    async def _generate_execution_report(
+        self, order: TradingOrder
+    ) -> None:  # pragma: no cover
         self.logger.info("Execution report generated for %s", order.id)
 
     async def _create_order(self, params: Dict[str, Any]) -> TradingOrder:
@@ -377,8 +429,14 @@ class RobustExecutionEngine:
             side=params["side"],
             order_type=OrderType(params.get("order_type", "market")),
             quantity=Decimal(str(params["quantity"])),
-            price=Decimal(str(params.get("price", "0"))) if params.get("price") else None,
-            stop_price=Decimal(str(params.get("stop_price", "0"))) if params.get("stop_price") else None,
+            price=(
+                Decimal(str(params.get("price", "0"))) if params.get("price") else None
+            ),
+            stop_price=(
+                Decimal(str(params.get("stop_price", "0")))
+                if params.get("stop_price")
+                else None
+            ),
         )
         return order
 
@@ -389,4 +447,3 @@ class RobustExecutionEngine:
     async def _save_order(self, order: TradingOrder) -> None:
         async with self.db.transaction():
             await self.db.save_order(order)
-
