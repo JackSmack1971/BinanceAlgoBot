@@ -34,13 +34,17 @@ class IndicatorRepository:
         async with self.db_connection as conn:
             await conn.execute_query(sql, values)
 
-    async def get_indicators_by_market_data_id(self, market_data_id: int):
+    async def get_indicators_by_market_data_id(
+        self, market_data_id: int, page_number: int = 1, page_size: int = 100
+    ):
         market_data_id = int(validate_quantity(market_data_id))
+        offset = (page_number - 1) * page_size
         sql = """
             SELECT * FROM indicators
             WHERE market_data_id = $1
+            LIMIT $2 OFFSET $3
         """
-        values = (market_data_id,)
+        values = (market_data_id, page_size, offset)
         async with self.db_connection as conn:
             return await conn.execute_query(sql, values)
 

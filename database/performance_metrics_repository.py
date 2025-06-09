@@ -63,13 +63,17 @@ class PerformanceMetricsRepository:
         async with self.db_connection as conn:
             await conn.execute_query(sql, values)
 
-    async def get_performance_metrics_by_trade_id(self, trade_id: int):
+    async def get_performance_metrics_by_trade_id(
+        self, trade_id: int, page_number: int = 1, page_size: int = 100
+    ):
         trade_id = int(validate_quantity(trade_id))
+        offset = (page_number - 1) * page_size
         sql = """
             SELECT * FROM performance_metrics
             WHERE trade_id = $1
+            LIMIT $2 OFFSET $3
         """
-        values = (trade_id,)
+        values = (trade_id, page_size, offset)
         async with self.db_connection as conn:
             return await conn.execute_query(sql, values)
 

@@ -45,13 +45,17 @@ class StrategyRepository:
         async with self.db_connection as conn:
             await conn.execute_query(sql, values)
 
-    async def get_strategy_by_name(self, strategy_name: str):
+    async def get_strategy_by_name(
+        self, strategy_name: str, page_number: int = 1, page_size: int = 100
+    ):
         strategy_name = sanitize_input(strategy_name)
+        offset = (page_number - 1) * page_size
         sql = """
             SELECT * FROM strategies
             WHERE strategy_name = $1
+            LIMIT $2 OFFSET $3
         """
-        values = (strategy_name,)
+        values = (strategy_name, page_size, offset)
         async with self.db_connection as conn:
             return await conn.execute_query(sql, values)
 

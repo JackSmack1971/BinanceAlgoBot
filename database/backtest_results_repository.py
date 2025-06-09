@@ -80,13 +80,17 @@ class BacktestResultsRepository:
         async with self.db_connection as conn:
             await conn.execute_query(sql, values)
 
-    async def get_backtest_results_by_strategy_id(self, strategy_id: int):
+    async def get_backtest_results_by_strategy_id(
+        self, strategy_id: int, page_number: int = 1, page_size: int = 100
+    ):
         strategy_id = int(validate_quantity(strategy_id))
+        offset = (page_number - 1) * page_size
         sql = """
             SELECT * FROM backtest_results
             WHERE strategy_id = $1
+            LIMIT $2 OFFSET $3
         """
-        values = (strategy_id,)
+        values = (strategy_id, page_size, offset)
         async with self.db_connection as conn:
             return await conn.execute_query(sql, values)
 

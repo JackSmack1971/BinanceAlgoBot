@@ -7,3 +7,6 @@ asyncpg==0.29.0
 pytest==8.3.5
 python_binance==1.0.28  # Pinned version
 ta==0.11.0  # Pinned version
+redis==5.0.4
+psutil==5.9.8
+fakeredis==2.23.2

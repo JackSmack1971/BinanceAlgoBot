@@ -1,16 +1,20 @@
 import logging
-from binance.client import Client
+import os
+import asyncio
 import pandas as pd
+from binance.client import Client
 from config import get_config
 from exceptions import BaseTradingException, DataError, DataRetrievalError
 
 logger = logging.getLogger(__name__)
 
 from utils import handle_error
+from cache import cache_result
+from performance_utils import log_memory_usage
 
 class DataFeed:
     @handle_error
-    def __init__(self, client: Client, symbol: str = None, interval: str = None):
+    def __init__(self, client: Client, symbol: str | None = None, interval: str | None = None):
         """
         Initialize the data feed.
         
@@ -27,40 +31,44 @@ class DataFeed:
         self.symbol = symbol if symbol else get_config('default_symbol')
         self.interval = interval if interval else BINANCE_CONSTANTS["KLINE_INTERVAL_15MINUTE"]
         
-        logger.info(f"Initialized DataFeed with symbol={self.symbol}, interval={self.interval}")
+        self.max_rows = int(os.getenv("DATAFRAME_MAX_ROWS", "1000"))
+        logger.info(
+            "Initialized DataFeed with symbol=%s, interval=%s", self.symbol, self.interval
+        )
 
-    def get_data(self):
-        """
-        Get historical data from Binance API.
-        
-        Returns:
-            pd.DataFrame: DataFrame containing historical market data
-            
-        Raises:
-            DataRetrievalError: If there is an error retrieving data from Binance
-        """
+    async def _fetch_klines(self) -> list:
         try:
-            logger.info("Retrieving data for %s on %s timeframe", self.symbol, self.interval)
-            klines = self.client.get_klines(symbol=self.symbol, interval=self.interval)
+            logger.info(
+                "Retrieving data for %s on %s timeframe", self.symbol, self.interval
+            )
+            return await asyncio.to_thread(
+                self.client.get_klines, symbol=self.symbol, interval=self.interval
+            )
         except Exception as exc:
             logger.warning("Data retrieval failed: %s", exc)
             raise DataRetrievalError(
                 f"Could not retrieve data for symbol {self.symbol} and interval {self.interval}"
             ) from exc
 
-        data = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignored'])
+    def _prepare_dataframe(self, klines: list) -> pd.DataFrame:
+        data = pd.DataFrame(
+            klines,
+            columns=[
+                'timestamp', 'open', 'high', 'low', 'close', 'volume',
+                'close_time', 'quote_asset_volume', 'trades',
+                'taker_buy_base', 'taker_buy_quote', 'ignored'
+            ]
+        )
         data = data.astype(float)
-        data.fillna(method='ffill', inplace=True)  # Handle missing data
-        
-        logger.debug(f"Retrieved {len(data)} data points")
-        
-        # Store data in the database
-        from database.market_data_repository import MarketDataRepository
-        market_data_repo = MarketDataRepository()
+        data.fillna(method='ffill', inplace=True)
+        return data.head(self.max_rows)
 
-        market_data_list = []
-        for _, row in data.iterrows():
-            market_data = {
+    async def _store_data(self, data: pd.DataFrame) -> None:
+        from database.market_data_repository import MarketDataRepository
+
+        market_data_repo = MarketDataRepository()
+        market_data_list = [
+            {
                 'symbol': self.symbol,
                 'interval': self.interval,
                 'timestamp': row['timestamp'],
@@ -74,14 +82,21 @@ class DataFeed:
                 'trades': row['trades'],
                 'taker_buy_base': row['taker_buy_base'],
                 'taker_buy_quote': row['taker_buy_quote'],
-                'ignored': row['ignored']
+                'ignored': row['ignored'],
             }
-            market_data_list.append(market_data)
-
+            for _, row in data.iterrows()
+        ]
         try:
-            market_data_repo.insert_market_data(market_data_list)
+            await market_data_repo.insert_market_data(market_data_list)
         except DataError as exc:
             logger.error("Database error storing market data: %s", exc)
             raise
-        
+
+    @cache_result(ttl=300)
+    async def get_data(self) -> pd.DataFrame:
+        klines = await self._fetch_klines()
+        data = self._prepare_dataframe(klines)
+        logger.debug("Retrieved %s data points", len(data))
+        await self._store_data(data)
+        log_memory_usage("DataFeed: ")
         return data
