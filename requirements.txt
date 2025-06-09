@@ -12,3 +12,4 @@ psutil==5.9.8
 fakeredis==2.23.2
 pydantic==2.7.1
 mypy==1.10.0
+numba==0.61.2  # Pinned version
