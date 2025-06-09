@@ -5,6 +5,7 @@ from .advanced_circuit_breaker import (
     CircuitBreakerMonitor,
     RateLimitError,
 )
+from .risk_monitor import RiskMonitor, RiskMonitorError
 from .kill_switch import KillSwitch, KillSwitchError
 from .risk_calculator import RiskCalculator
 from .compliance_monitor import ComplianceMonitor, ComplianceViolation, Trade
@@ -26,4 +27,6 @@ __all__ = [
     "CircuitBreakerRegistry",
     "CircuitBreakerMonitor",
     "RateLimitError",
+    "RiskMonitor",
+    "RiskMonitorError",
 ]

@@ -13,6 +13,7 @@ psutil==5.9.8
 fakeredis==2.23.2
 pydantic==2.7.1
 mypy==1.10.0
+scikit-learn==1.4.2
 numba==0.61.2  # Pinned version
 prometheus_client==0.20.0
 aiohttp==3.9.5
