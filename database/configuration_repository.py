@@ -25,13 +25,17 @@ class ConfigurationRepository:
         async with self.db_connection as conn:
             await conn.execute_query(sql, values)
 
-    async def get_configuration_by_name(self, config_name: str):
+    async def get_configuration_by_name(
+        self, config_name: str, page_number: int = 1, page_size: int = 100
+    ):
         config_name = sanitize_input(config_name)
+        offset = (page_number - 1) * page_size
         sql = """
             SELECT * FROM configurations
             WHERE config_name = $1
+            LIMIT $2 OFFSET $3
         """
-        values = (config_name,)
+        values = (config_name, page_size, offset)
         async with self.db_connection as conn:
             return await conn.execute_query(sql, values)
 

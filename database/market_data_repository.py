@@ -46,7 +46,7 @@ class MarketDataRepository:
             for data in market_data_list
         ]
         async with self.db_connection as conn:
-            await conn.execute_query(sql, values)
+            await conn.execute_batch(sql, values)
 
     async def get_market_data(
         self,

@@ -1,6 +1,7 @@
 import asyncio
 import asyncpg
 import logging
+import os
 from typing import Any, Iterable, Optional
 
 from config import DATABASE_URL
@@ -12,10 +13,12 @@ logger = logging.getLogger(__name__)
 class DatabaseConnection:
     """Async wrapper around an asyncpg connection pool."""
 
-    def __init__(self, min_conn: int = 1, max_conn: int = 10) -> None:
+    def __init__(self, min_conn: int | None = None, max_conn: int | None = None) -> None:
         self.conn_pool: Optional[asyncpg.pool.Pool] = None
-        self.min_conn = min_conn
-        self.max_conn = max_conn
+        env_min = os.getenv("DB_POOL_MIN")
+        env_max = os.getenv("DB_POOL_MAX")
+        self.min_conn = int(env_min) if env_min else (min_conn or 1)
+        self.max_conn = int(env_max) if env_max else (max_conn or 10)
 
     async def connect(self) -> None:
         """Initialize the async connection pool with simple retry logic."""
@@ -65,4 +68,21 @@ class DatabaseConnection:
             except Exception as exc:
                 logger.error("Error executing query: %s", exc, exc_info=True)
                 raise DataError(f"Error executing query: {exc}") from exc
+
+    async def execute_batch(
+        self, query: str, params: Iterable[Iterable[Any]] | None = None
+    ) -> None:
+        """Execute many statements using a pooled connection."""
+        if not self.conn_pool:
+            await self.connect()
+        async with self.conn_pool.acquire() as conn:
+            try:
+                if params:
+                    await conn.executemany(query, list(params))
+                else:
+                    await conn.execute(query)
+            except Exception as exc:
+                logger.error("Batch execution error: %s", exc, exc_info=True)
+                raise DataError(f"Error executing batch: {exc}") from exc
+
 
