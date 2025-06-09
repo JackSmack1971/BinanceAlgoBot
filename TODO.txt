@@ -1,5 +1,1 @@
-handle missing data. 
-add error checking.
-trade on multiple intervals and with multiple coins.
-use sophisticated order management with multiple order types. 
-leverage an optimizer to automatically optimize strategy parameters.
+
