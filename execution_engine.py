@@ -5,6 +5,7 @@ import pandas as pd
 from strategies.base_strategy import BaseStrategy
 from exchange_interface import ExchangeInterface
 from position_manager import PositionManager
+from decimal import Decimal
 from exceptions import BaseTradingException, ExchangeError, TradeExecutionError
 
 logger = logging.getLogger(__name__)
@@ -90,11 +91,12 @@ class ExecutionEngine(ExecutionEngineInterface):
             logger.info(f"Buy order executed: {order}")
 
             # Open position in PositionManager
-            self.position_manager.open_position(
+            await self.position_manager.open_position(
                 symbol=self.strategy.symbol,
-                side="buy",
-                price=0.0,  # Replace with actual price
-                size=self.quantity
+                side="BUY",
+                entry_price=Decimal("0"),  # Replace with actual price
+                quantity=Decimal(str(self.quantity)),
+                risk_params={},
             )
 
         except Exception as exc:
@@ -133,9 +135,9 @@ class ExecutionEngine(ExecutionEngineInterface):
     async def close_positions(self, order_by_loss: bool = False) -> None:
         """Close open positions based on current risk."""
         try:
-            position = self.position_manager.get_position()
+            position = await self.position_manager.get_position(self.strategy.symbol)
             if position:
-                self.position_manager.close_position(position["symbol"], 0.0)
+                await self.position_manager.close_position(position.symbol, Decimal("0"))
                 logger.info("Closed position for %s", position["symbol"])
         except Exception as exc:
             logger.error("Failed to close positions: %s", exc, exc_info=True)
@@ -164,9 +166,9 @@ class ExecutionEngine(ExecutionEngineInterface):
             logger.info(f"Sell order executed: {order}")
 
             # Close position in PositionManager
-            self.position_manager.close_position(
+            await self.position_manager.close_position(
                 symbol=self.strategy.symbol,
-                price=0.0  # Replace with actual price
+                exit_price=Decimal("0")  # Replace with actual price
             )
 
         except Exception as exc:

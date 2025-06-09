@@ -5,6 +5,7 @@ from pandas import DataFrame
 from data_feed import DataFeed
 from indicators import TechnicalIndicators
 from config import get_config
+from decimal import Decimal
 from utils import handle_error
 from exceptions import DataError, StrategyError
 from .base_strategy import BaseStrategy
@@ -72,37 +73,37 @@ class BTCStrategy(BaseStrategy):
                     and data["rsi"].iloc[i] > rsi_buy
                 ):
                     data.loc[data.index[i], "signal"] = 1.0
-                    if self.position_manager.get_position() is None:
+                    if await self.position_manager.get_position(self.symbol) is None:
                         price = data["close"].iloc[i]
                         size = self.position_manager.calculate_position_size(price)
-                        self.open_position("buy", price, size)
+                        await self.open_position("buy", price, size)
                 elif (
                     data["close"].iloc[i] < data["vwap"].iloc[i]
                     and data["close"].iloc[i - 1] >= data["vwap"].iloc[i - 1]
                     and data["rsi"].iloc[i] < rsi_sell
                 ):
                     data.loc[data.index[i], "signal"] = -1.0
-                    if self.position_manager.get_position() is None:
+                    if await self.position_manager.get_position(self.symbol) is None:
                         price = data["close"].iloc[i]
                         size = self.position_manager.calculate_position_size(price)
-                        self.open_position("sell", price, size)
+                        await self.open_position("sell", price, size)
                 elif (
                     data["close"].iloc[i] > data["ema"].iloc[i]
                     and data["atr"].iloc[i] > data["atr"].iloc[i - 1] * volatility_increase
                 ):
                     data.loc[data.index[i], "signal"] = -1.0
-                    if self.position_manager.get_position() is not None:
+                    if await self.position_manager.get_position(self.symbol) is not None:
                         price = data["close"].iloc[i]
-                        self.close_position(price)
+                        await self.close_position(price)
                 elif (
                     data["close"].iloc[i] < data["ema"].iloc[i]
                     and data["atr"].iloc[i] < data["atr"].iloc[i - 1] * volatility_decrease
                     and data["rsi"].iloc[i] > rsi_oversold
                 ):
                     data.loc[data.index[i], "signal"] = 1.0
-                    if self.position_manager.get_position() is not None:
+                    if await self.position_manager.get_position(self.symbol) is not None:
                         price = data["close"].iloc[i]
-                        self.close_position(price)
+                        await self.close_position(price)
             data["position"] = 0
             if data["signal"].iloc[0] != 0:
                 data.loc[data.index[0], "position"] = data["signal"].iloc[0]
@@ -117,8 +118,16 @@ class BTCStrategy(BaseStrategy):
             logger.error("Error generating trading signals: %s", exc, exc_info=True)
             raise StrategyError(f"Error generating trading signals: {exc}") from exc
 
-    def open_position(self, side: str, price: float, size: float) -> None:
-        self.position_manager.open_position(self.symbol, side, price, size)
+    async def open_position(self, side: str, price: float, size: float) -> None:
+        await self.position_manager.open_position(
+            self.symbol,
+            side,
+            Decimal(str(price)),
+            Decimal(str(size)),
+            {},
+        )
 
-    def close_position(self, price: float) -> None:
-        self.position_manager.close_position(self.symbol, price)
+    async def close_position(self, price: float) -> None:
+        await self.position_manager.close_position(
+            self.symbol, Decimal(str(price))
+        )
