@@ -92,3 +92,44 @@ For live trading ensure your API keys are set and run:
 python main.py --mode live --symbol BTCUSDT --interval 15m --strategy btc
 ```
 
+
+## Quick Start
+
+1. Copy `.env.example` to `.env` and fill in your Binance credentials and database connection.
+2. Run the setup script to install dependencies:
+
+```bash
+python scripts/setup.py
+```
+
+3. Start the local stack with Docker:
+
+```bash
+docker-compose up --build
+```
+
+## Configuration Examples
+
+Environment variables:
+
+```bash
+export BINANCE_API_KEY="your_key"
+export BINANCE_SECRET_KEY="your_secret"
+export DATABASE_URL="postgresql://bot:bot@localhost:5432/trading"
+```
+
+## Troubleshooting
+
+- Run `python scripts/health_check.py` if the application fails to start.
+- Ensure PostgreSQL is reachable using the `DATABASE_URL` setting.
+- Verify Binance API keys are correct and not rate limited.
+
+## Performance Tuning Tips
+
+- Adjust strategy windows in `config.json` to optimize results.
+- Increase `DB_POOL_MAX` for heavy workloads.
+- Use shorter intervals for more trades but higher resource usage.
+
+## Monitoring and Logging
+
+Logging is configured via `logging.conf`. Adjust log levels or handlers in that file to change output destinations. Run `python scripts/health_check.py` regularly to ensure the bot and database remain operational.
