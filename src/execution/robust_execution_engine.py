@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -18,6 +19,7 @@ from src.risk import (
     CircuitBreakerError,
     RateLimitError,
 )
+from src.monitoring import AuditTrailRecorder
 
 __all__ = [
     "OrderStatus",
@@ -167,6 +169,7 @@ class RobustExecutionEngine:
         risk_manager: Any,
         database_manager: Any,
         breaker: AdvancedCircuitBreaker | None = None,
+        audit_trail: AuditTrailRecorder | None = None,
     ) -> None:
         self.exchange = exchange_interface
         self.position_manager = position_manager
@@ -182,6 +185,7 @@ class RobustExecutionEngine:
         self.execution_metrics = ExecutionMetrics()
         self.logger = logging.getLogger(__name__)
         self._reconciliation_task: Optional[asyncio.Task[Any]] = None
+        self.audit_trail = audit_trail or AuditTrailRecorder()
 
     async def start(self) -> None:  # pragma: no cover
         self._reconciliation_task = asyncio.create_task(self._reconciliation_loop())
@@ -447,3 +451,7 @@ class RobustExecutionEngine:
     async def _save_order(self, order: TradingOrder) -> None:
         async with self.db.transaction():
             await self.db.save_order(order)
+        await self.audit_trail.record_event(
+            order.status.value,
+            json.loads(json.dumps(order.__dict__, default=str)),
+        )

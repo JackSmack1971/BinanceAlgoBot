@@ -50,3 +50,8 @@ class PerformanceMetricsServiceException(BaseTradingException):
 class CredentialError(BaseTradingException):
     """Exception raised for credential handling failures."""
     pass
+
+
+class AuditTrailError(BaseTradingException):
+    """Exception raised for audit trail failures."""
+    pass
