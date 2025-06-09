@@ -1,5 +1,8 @@
 import logging
 from typing import Any, Dict
+from decimal import Decimal
+
+from finance.financial_calculator import FinancialCalculator
 
 import pandas as pd
 from utils import handle_error
@@ -13,12 +16,13 @@ class PerformanceAnalyzer:
 
     @handle_error
     def __init__(self, initial_capital: float = 10000.0, commission: float = 0.001) -> None:
-        self.initial_capital = initial_capital
-        self.commission = commission
+        self.calculator = FinancialCalculator()
+        self.initial_capital = Decimal(str(initial_capital))
+        self.commission = Decimal(str(commission))
         logger.info(
             "Initialized PerformanceAnalyzer with initial capital: %s and commission: %s",
-            initial_capital,
-            commission,
+            self.initial_capital,
+            self.commission,
         )
 
     async def calculate_performance(self, signals: pd.DataFrame) -> Dict[str, Any]:
@@ -46,47 +50,47 @@ class PerformanceAnalyzer:
         """Return a DataFrame with individual trade statistics."""
         trades = []
         in_position = False
-        entry_price = 0.0
+        entry_price = Decimal("0")
         entry_time = None
         position_type = None
         for idx, row in results.iterrows():
             if not in_position and row["position"] != 0:
                 in_position = True
-                entry_price = row["close"]
+                entry_price = Decimal(str(row["close"]))
                 entry_time = idx
                 position_type = "long" if row["position"] > 0 else "short"
             elif in_position and (row["position"] == 0 or (row["position"] > 0 and position_type == "short") or (row["position"] < 0 and position_type == "long")):
-                exit_price = row["close"]
+                exit_price = Decimal(str(row["close"]))
                 exit_time = idx
-                profit_pct = (exit_price / entry_price - 1) if position_type == "long" else (1 - exit_price / entry_price)
-                profit_pct -= self.commission * 2
+                pnl = self.calculator.calculate_profit_loss(entry_price, exit_price, Decimal("1"), "BUY" if position_type == "long" else "SELL")
+                profit_pct = pnl["percentage_pnl"] - (self.commission * Decimal("200"))
                 trades.append({
                     "entry_time": entry_time,
                     "exit_time": exit_time,
                     "position_type": position_type,
-                    "entry_price": entry_price,
-                    "exit_price": exit_price,
-                    "profit_pct": profit_pct,
+                    "entry_price": float(entry_price),
+                    "exit_price": float(exit_price),
+                    "profit_pct": float(profit_pct),
                     "duration": (exit_time - entry_time).total_seconds() / 3600,
                 })
                 in_position = False
                 if row["position"] != 0:
                     in_position = True
-                    entry_price = row["close"]
+                    entry_price = Decimal(str(row["close"]))
                     entry_time = idx
                     position_type = "long" if row["position"] > 0 else "short"
         if in_position:
-            exit_price = results.iloc[-1]["close"]
+            exit_price = Decimal(str(results.iloc[-1]["close"]))
             exit_time = results.index[-1]
-            profit_pct = (exit_price / entry_price - 1) if position_type == "long" else (1 - exit_price / entry_price)
-            profit_pct -= self.commission
+            pnl = self.calculator.calculate_profit_loss(entry_price, exit_price, Decimal("1"), "BUY" if position_type == "long" else "SELL")
+            profit_pct = pnl["percentage_pnl"] - (self.commission * Decimal("100"))
             trades.append({
                 "entry_time": entry_time,
                 "exit_time": exit_time,
                 "position_type": position_type,
-                "entry_price": entry_price,
-                "exit_price": exit_price,
-                "profit_pct": profit_pct,
+                "entry_price": float(entry_price),
+                "exit_price": float(exit_price),
+                "profit_pct": float(profit_pct),
                 "duration": (exit_time - entry_time).total_seconds() / 3600,
                 "status": "open",
             })
