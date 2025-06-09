@@ -15,8 +15,15 @@ class DummyPool:
     def __init__(self) -> None:
         self.connection = DummyConn()
 
-    async def acquire(self):
-        return self.connection
+    def acquire(self):
+        class _CM:
+            async def __aenter__(self_inner):
+                return self.connection
+
+            async def __aexit__(self_inner, exc_type, exc, tb):
+                return False
+
+        return _CM()
 
     async def release(self, conn):
         pass

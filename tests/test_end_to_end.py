@@ -16,7 +16,8 @@ class DummyStrategy(BaseStrategy):
         pass
 
     def run(self):
-        return pd.DataFrame({"close": [100, 110], "signal": [0, 1], "position": [0, 1]})
+        index = pd.date_range("2020-01-01", periods=2, freq="D")
+        return pd.DataFrame({"close": [100, 110], "signal": [0, 1], "position": [0, 1]}, index=index)
 
     def open_position(self, side: str, price: float, size: float):
         self.position_manager.open_position(self.symbol, side, price, size)
@@ -38,5 +39,11 @@ async def test_full_workflow(monkeypatch):
 
     strategy = DummyStrategy()
     analyzer = PerformanceAnalyzer()
+    from service.service_locator import ServiceLocator
+    class DummyMetricsService:
+        async def insert_performance_metrics(self, **kwargs):
+            return None
+
+    ServiceLocator().register("PerformanceMetricsService", DummyMetricsService())
     results = await analyzer.calculate_performance(strategy.run())
     assert "metrics" in results
