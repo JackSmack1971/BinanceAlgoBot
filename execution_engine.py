@@ -121,6 +121,26 @@ class ExecutionEngine(ExecutionEngineInterface):
         except Exception as exc:
             logger.error("Error storing trade history: %s", exc, exc_info=True)
 
+    async def cancel_all_orders(self) -> None:
+        """Cancel all open orders for the strategy symbol."""
+        try:
+            await self.exchange_interface.cancel_all_orders(self.strategy.symbol)
+            logger.info("Cancelled all orders for %s", self.strategy.symbol)
+        except Exception as exc:
+            logger.error("Failed to cancel orders: %s", exc, exc_info=True)
+            raise TradeExecutionError("Cancel orders failed") from exc
+
+    async def close_positions(self, order_by_loss: bool = False) -> None:
+        """Close open positions based on current risk."""
+        try:
+            position = self.position_manager.get_position()
+            if position:
+                self.position_manager.close_position(position["symbol"], 0.0)
+                logger.info("Closed position for %s", position["symbol"])
+        except Exception as exc:
+            logger.error("Failed to close positions: %s", exc, exc_info=True)
+            raise TradeExecutionError("Close positions failed") from exc
+
     async def _execute_sell(self):
         """Execute a sell order."""
         try:

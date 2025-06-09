@@ -10,6 +10,10 @@ from BinanceExchangeInterface import BinanceExchangeInterface
 from config import get_config
 from execution_engine import ExecutionEngine
 from risk_management import RiskManagement
+from src.risk.circuit_breaker import CircuitBreaker
+from src.risk.kill_switch import KillSwitch
+from src.risk.risk_calculator import RiskCalculator
+from src.risk.compliance_monitor import ComplianceMonitor
 from strategy_factory import StrategyFactory
 from strategies.base_strategy import BaseStrategy
 from signal_manager import SignalManager
@@ -58,6 +62,10 @@ class TradingOrchestrator:
         
         # Dictionary to store strategy, execution, and risk management components for each symbol-interval pair
         self.components: Dict[str, Dict] = {}
+        self.circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self.kill_switch: KillSwitch | None = None
+        self.risk_calculator = RiskCalculator()
+        self.compliance_monitor = ComplianceMonitor()
         
         # Initialize running state
         self.is_running = False
@@ -110,19 +118,32 @@ class TradingOrchestrator:
                         continue
                 
                     # Initialize components
-                    engine = ExecutionEngine(self.client, strategy, self.config_service.get_config("default_quantity"), self.position_manager)
-                    risk_management = RiskManagement(self.client, strategy, engine, self.config_service.get_config("max_risk_per_trade"))
+                    engine = ExecutionEngine(
+                        self.client,
+                        strategy,
+                        self.config_service.get_config("default_quantity"),
+                        self.position_manager,
+                    )
+                    risk_management = RiskManagement(
+                        self.client,
+                        strategy,
+                        engine,
+                        self.config_service.get_config("max_risk_per_trade"),
+                    )
+                    circuit = CircuitBreaker(3, 60.0, 2)
 
                     # Store components in a dictionary
                     self.components[key] = {
                         "strategy": strategy,
                         "execution_engine": engine,
-                        "risk_management": risk_management
+                        "risk_management": risk_management,
                     }
+                    self.circuit_breakers[key] = circuit
 
                 
                     logger.info(f"Initialized components for {key}")
         
+            self.kill_switch = KillSwitch([c["execution_engine"] for c in self.components.values()])
             logger.info("All components initialized successfully")
             return True
         
@@ -168,6 +189,7 @@ class TradingOrchestrator:
             strategy = components["strategy"]
             execution_engine = components["execution_engine"]
             risk_management = components["risk_management"]
+            circuit = self.circuit_breakers.get(key)
 
             # Step 1: Update risk parameters
             logger.info(f"Managing risk for {key}")
@@ -182,9 +204,12 @@ class TradingOrchestrator:
                 logger.info(f"Processing signals for {key}")
                 processed_signals = self.signal_manager.process_signal(signals)
 
-                # Step 4: Execute trades based on processed signals
+                # Step 4: Execute trades with circuit breaker protection
                 logger.info(f"Executing trades for {key}")
-                await execution_engine.execute_trades(processed_signals)
+                if circuit:
+                    await circuit.call(execution_engine.execute_trades, processed_signals)
+                else:
+                    await execution_engine.execute_trades(processed_signals)
             else:
                 logger.warning(f"No signals generated for {key}")
 
@@ -378,3 +403,9 @@ class TradingOrchestrator:
         except Exception as e:
             logger.error(f"Error stopping trading: {e}", exc_info=True)
             raise BaseTradingException(f"Error stopping trading: {e}") from e
+
+    async def activate_kill_switch(self) -> None:
+        if self.kill_switch is None:
+            logger.warning("Kill switch not initialized")
+            return
+        await self.kill_switch.activate()
