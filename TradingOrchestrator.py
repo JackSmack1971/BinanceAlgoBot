@@ -10,7 +10,8 @@ from BinanceExchangeInterface import BinanceExchangeInterface
 from config import get_config
 from execution_engine import ExecutionEngine
 from risk_management import RiskManagement
-from strategy_factory import StrategyFactory, Strategy
+from strategy_factory import StrategyFactory
+from strategies.base_strategy import BaseStrategy
 from signal_manager import SignalManager
 from exceptions import BaseTradingException, StrategyError, ExchangeError
 from position_manager import PositionManager

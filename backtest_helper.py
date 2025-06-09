@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-from strategy_factory import Strategy
+from strategies.base_strategy import BaseStrategy
 from typing import Dict, Any
 from backtest_configuration import BacktestConfiguration
 from exceptions import DataError, StrategyError
@@ -41,13 +41,13 @@ class BacktestHelper:
             return pd.DataFrame()
 
     @staticmethod
-    def apply_strategy(data: pd.DataFrame, strategy: Strategy) -> pd.DataFrame:
+    def apply_strategy(data: pd.DataFrame, strategy: BaseStrategy) -> pd.DataFrame:
         """
         Applies the strategy to generate signals.
 
         Args:
             data (pd.DataFrame): DataFrame with historical data.
-            strategy (Strategy): Trading strategy to apply.
+            strategy (BaseStrategy): Trading strategy to apply.
 
         Returns:
             pd.DataFrame: DataFrame with trading signals.

@@ -8,7 +8,7 @@ from binance.client import Client
 from utils import handle_error
 from exceptions import BaseTradingException
 
-from strategy_factory import Strategy
+from strategies.base_strategy import BaseStrategy
 from config import get_config
 from backtest_configuration import BacktestConfiguration
 from BacktestExecutor import BacktestExecutor
